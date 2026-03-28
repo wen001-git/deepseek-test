@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>短视频创作助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; }
+
+    /* ════════════════════════════════
+       桌面端布局（>768px）
+    ════════════════════════════════ */
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+
+    /* 侧边栏 */
+    .sidebar { width: 220px; background: #1a1a2e; color: #ccc; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-header { padding: 24px 20px 16px; border-bottom: 1px solid #2d2d4e; }
+    .sidebar-header h1 { font-size: 16px; color: #fff; font-weight: 600; line-height: 1.4; }
+    .sidebar-header p { font-size: 11px; color: #888; margin-top: 4px; }
+    .nav-group { padding: 12px 0; }
+    .nav-group-title { font-size: 11px; color: #555; padding: 4px 20px 8px; letter-spacing: 0.5px; text-transform: uppercase; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-size: 14px; transition: all 0.15s; border-left: 3px solid transparent; }
+    .nav-item:hover { background: #2d2d4e; color: #fff; }
+    .nav-item.active { background: #2d2d4e; color: #fff; border-left-color: #6366f1; }
+    .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+
+    /* 内容区（桌面） */
+    .main { flex: 1; overflow-y: auto; padding: 32px; }
+
+    /* ════════════════════════════════
+       手机端布局（≤768px）
+    ════════════════════════════════ */
+    @media (max-width: 768px) {
+      .layout { flex-direction: column; height: 100dvh; }
+      .sidebar { display: none; }
+
+      /* 顶部栏 */
+      .mobile-header {
+        display: flex; align-items: center; justify-content: center;
+        height: 52px; background: #1a1a2e; flex-shrink: 0;
+        position: sticky; top: 0; z-index: 10;
+      }
+      .mobile-header h1 { font-size: 16px; color: #fff; font-weight: 600; }
+
+      /* 内容区（手机） */
+      .main { padding: 16px 16px 80px; overflow-y: auto; flex: 1; }
+
+      /* 底部导航 */
+      .bottom-nav {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: #fff; border-top: 1px solid #e8e8e8;
+        display: flex; overflow-x: auto; scrollbar-width: none;
+        z-index: 100; height: 60px; align-items: stretch;
+        -webkit-overflow-scrolling: touch;
+      }
+      .bottom-nav::-webkit-scrollbar { display: none; }
+      .bottom-nav-item {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-width: 68px; padding: 6px 4px; cursor: pointer; flex-shrink: 0;
+        border-top: 2px solid transparent; transition: all 0.15s; gap: 2px;
+      }
+      .bottom-nav-item.active { border-top-color: #6366f1; }
+      .bottom-nav-item .b-icon { font-size: 20px; line-height: 1; }
+      .bottom-nav-item .b-label { font-size: 10px; color: #888; white-space: nowrap; }
+      .bottom-nav-item.active .b-label { color: #6366f1; font-weight: 600; }
+    }
+
+    /* 桌面端隐藏手机组件 */
+    @media (min-width: 769px) {
+      .mobile-header { display: none; }
+      .bottom-nav { display: none; }
+    }
+
+    /* ════════════════════════════════
+       通用面板样式
+    ════════════════════════════════ */
+    .panel { display: none; max-width: 720px; margin: 0 auto; }
+    .panel.active { display: block; }
+    .panel-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .panel-desc { font-size: 13px; color: #888; margin-bottom: 20px; line-height: 1.5; }
+
+    /* 卡片 */
+    .card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); margin-bottom: 16px; }
+
+    /* 表单元素 */
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 7px; margin-top: 18px; }
+    label:first-child { margin-top: 0; }
+    input[type="text"], textarea, select {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #e5e7eb;
+      border-radius: 10px; font-size: 15px; outline: none;
+      transition: border 0.2s; font-family: inherit; background: #fafafa; color: #333;
+      -webkit-appearance: none; appearance: none;
+    }
+    select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23999' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+    input[type="text"]:focus, textarea:focus, select:focus { border-color: #6366f1; background: #fff; }
+    textarea { resize: vertical; min-height: 110px; line-height: 1.6; }
+
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    @media (max-width: 480px) {
+      .row { flex-direction: column; gap: 0; }
+    }
+
+    /* 多选标签 */
+    .checkbox-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .checkbox-label {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 14px; border: 1.5px solid #e5e7eb;
+      border-radius: 20px; cursor: pointer; font-size: 13px;
+      transition: all 0.15s; background: #fafafa; user-select: none;
+    }
+    .checkbox-label input { display: none; }
+    .checkbox-label.checked { background: #ede9fe; border-color: #6366f1; color: #4f46e5; font-weight: 500; }
+
+    /* 提示 */
+    .hint { font-size: 12px; color: #bbb; margin-top: 5px; line-height: 1.4; }
+
+    /* 按钮 */
+    .btn-primary {
+      width: 100%; margin-top: 20px; padding: 14px;
+      background: #6366f1; color: #fff; border: none;
+      border-radius: 12px; font-size: 16px; font-weight: 600;
+      cursor: pointer; transition: background 0.2s; font-family: inherit;
+      -webkit-appearance: none;
+    }
+    .btn-primary:active { background: #4338ca; }
+    .btn-primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+    .btn-copy {
+      margin-top: 14px; padding: 9px 20px;
+      background: #f3f4f6; color: #555; border: 1px solid #e5e7eb;
+      border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .btn-copy:active { background: #e5e7eb; }
+
+    /* 结果区 */
+    .result-card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); display: none; }
+    .result-card.show { display: block; }
+    .result-label { font-size: 12px; font-weight: 600; color: #6366f1; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .result-content { white-space: pre-wrap; line-height: 1.9; font-size: 14px; color: #333; }
+
+    /* spinner */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── 手机顶部栏 ── -->
+  <div class="mobile-header"><h1>短视频创作助手</h1></div>
+
+  <!-- ── 桌面侧边栏 ── -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>短视频创作助手</h1>
+      <p>AI 驱动的创作工具</p>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">账号规划</div>
+      <div class="nav-item active" onclick="switchPanel('positioning', this)"><span class="icon">🎯</span> 定位分析</div>
+      <div class="nav-item" onclick="switchPanel('viral', this)"><span class="icon">🔥</span> 爆款选题</div>
+      <div class="nav-item" onclick="switchPanel('monetize', this)"><span class="icon">💰</span> 变现选题</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">内容创作</div>
+      <div class="nav-item" onclick="switchPanel('script', this)"><span class="icon">📝</span> 脚本制作</div>
+      <div class="nav-item" onclick="switchPanel('rewrite', this)"><span class="icon">✏️</span> 文案二创</div>
+    </div>
+    <div class="nav-group">
+      <div class="nav-group-title">进阶工具</div>
+      <div class="nav-item" onclick="switchPanel('breakdown', this)"><span class="icon">🔍</span> 爆款拆解</div>
+      <div class="nav-item" onclick="switchPanel('director', this)"><span class="icon">🎬</span> 编导专栏</div>
+    </div>
+  </div>
+
+  <!-- ── 内容区 ── -->
+  <div class="main" id="main-scroll">
+
+    <!-- ① 定位分析 -->
+    <div class="panel active" id="panel-positioning">
+      <div class="panel-title">🎯 定位分析</div>
+      <div class="panel-desc">填写你的基本情况，AI 为你制定精准的账号定位方案</div>
+      <div class="card">
+        <label>① 行业和领域</label>
+        <select id="pos-industry">
+          {% for ind in industries %}<option value="{{ ind }}">{{ ind }}</option>{% endfor %}
+        </select>
+
+        <label>② 你的特长和优势</label>
+        <textarea id="pos-strengths" placeholder="例如：我是厨师，有 10 年做菜经验，擅长家常菜&#10;或：我喜欢旅行，去过 30 个国家，擅长拍风景"></textarea>
+
+        <label>③ 可用资源（可多选）</label>
+        <div class="checkbox-group" id="pos-resources">
+          {% for r in resources %}
+          <label class="checkbox-label" onclick="toggleCheck(this)"><input type="checkbox" value="{{ r }}"> {{ r }}</label>
+          {% endfor %}
+        </div>
+
+        <label>④ 目标平台（可多选）</label>
+        <div class="checkbox-group" id="pos-platforms">
+          {% for p in platforms %}
+          <label class="checkbox-label" onclick="toggleCheck(this)"><input type="checkbox" value="{{ p }}"> {{ p }}</label>
+          {% endfor %}
+        </div>
+
+        <button class="btn-primary" onclick="submit('positioning')">生成定位方案</button>
+      </div>
+      <div class="result-card" id="result-positioning">
+        <div class="result-label">AI 定位方案</div>
+        <div class="result-content" id="content-positioning"></div>
+        <button class="btn-copy" onclick="copyResult('positioning')">复制结果</button>
+      </div>
+    </div>
+
+    <!-- ② 爆款选题 -->
+    <div class="panel" id="panel-viral">
+      <div class="panel-title">🔥 爆款选题</div>
+      <div class="panel-desc">输入你的赛道，AI 生成 10 个有爆款潜力的选题</div>
+      <div class="card">
+        <label>账号赛道</label>
+        <select id="viral-industry">
+          {% for ind in industries %}<option value="{{ ind }}">{{ ind }}</option>{% endfor %}
+        </select>
+
+        <label>发布平台</label>
+        <select id="viral-platform">
+          {% for p in platforms %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+
+        <button class="btn-primary" onclick="submit('viral')">生成爆款选题</button>
+      </div>
+      <div class="result-card" id="result-viral">
+        <div class="result-label">AI 爆款选题</div>
+        <div class="result-content" id="content-viral"></div>
+        <button class="btn-copy" onclick="copyResult('viral')">复制结果</button>
+      </div>
+    </div>
+
+    <!-- ③ 变现选题 -->
+    <div class="panel" id="panel-monetize">
+      <div class="panel-title">💰 变现选题</div>
+      <div class="panel-desc">结合你的赛道和粉丝量，AI 给出最适合你的变现路径和对应选题</div>
+      <div class="card">
+        <label>账号赛道</label>
+        <select id="mon-industry">
+          {% for ind in industries %}<option value="{{ ind }}">{{ ind }}</option>{% endfor %}
+        </select>
+
+        <label>当前粉丝量</label>
+        <select id="mon-followers">
+          {% for f in follower_ranges %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+        </select>
+
+        <button class="btn-primary" onclick="submit('monetize')">生成变现方案</button>
+      </div>
+      <div class="result-card" id="result-monetize">
+        <div class="result-label">AI 变现方案</div>
+        <div class="result-content" id="content-monetize"></div>
+        <button class="btn-copy" onclick="copyResult('monetize')">复制结果</button>
+      </div>
+    </div>
+
+    <!-- ④ 脚本制作 -->
+    <div class="panel" id="panel-script">
+      <div class="panel-title">📝 脚本制作</div>
+      <div class="panel-desc">输入视频主题，AI 生成完整拍摄脚本（含台词和镜头说明）</div>
+      <div class="card">
+        <label>视频主题</label>
+        <input type="text" id="script-topic" placeholder="例如：北京最好吃的烤鸭">
+
+        <div class="row">
+          <div>
+            <label>视频类型</label>
+            <select id="script-type">
+              <option value="通用">通用</option>
+              {% for k, v in video_types.items() %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+            </select>
+          </div>
+          <div>
+            <label>文案风格</label>
+            <select id="script-style">
+              {% for k, v in styles.items() %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <label>视频时长</label>
+        <select id="script-duration">
+          <option value="30">30 秒</option>
+          <option value="60" selected>60 秒</option>
+          <option value="90">90 秒</option>
+          <option value="180">3 分钟</option>
+        </select>
+
+        <button class="btn-primary" onclick="submit('script')">生成脚本</button>
+      </div>
+      <div class="result-card" id="result-script">
+        <div class="result-label">AI 拍摄脚本</div>
+        <div class="result-content" id="content-script"></div>
+        <button class="btn-copy" onclick="copyResult('script')">复制结果</button>
+      </div>
+    </div>
+
+    <!-- ⑤ 文案二创 -->
+    <div class="panel" id="panel-rewrite">
+      <div class="panel-title">✏️ 文案二创</div>
+      <div class="panel-desc">粘贴已有文案，AI 生成 3 个不同风格的改写版本</div>
+      <div class="card">
+        <label>原始文案</label>
+        <textarea id="rewrite-original" style="min-height: 150px;" placeholder="粘贴你想要改写的文案或视频标题..."></textarea>
+        <button class="btn-primary" onclick="submit('rewrite')">生成改写版本</button>
+      </div>
+      <div class="result-card" id="result-rewrite">
+        <div class="result-label">AI 改写版本</div>
+        <div class="result-content" id="content-rewrite"></div>
+        <button class="btn-copy" onclick="copyResult('rewrite')">复制结果</button>
+      </div>
+    </div>
+
+    <!-- ⑥ 爆款拆解 -->
+    <div class="panel" id="panel-breakdown">
+      <div class="panel-title">🔍 爆款拆解</div>
+      <div class="panel-desc">输入爆款视频的标题和内容，AI 深度分析其爆款逻辑和可复用公式</div>
+      <div class="card">
+        <label>视频标题 <span style="color:#e53e3e">*</span></label>
+        <input type="text" id="bd-title" placeholder="输入爆款视频的标题">
+
+        <label>视频文案或内容简介（选填）</label>
+        <textarea id="bd-content" placeholder="粘贴视频脚本、字幕或内容简介，分析会更准确"></textarea>
+        <p class="hint">只填标题也可以分析，填入内容后分析更深入</p>
+
+        <button class="btn-primary" onclick="submit('breakdown')">开始拆解分析</button>
+      </div>
+      <div class="result-card" id="result-breakdown">
+        <div class="result-label">AI 爆款分析</div>
+        <div class="result-content" id="content-breakdown"></div>
+        <button class="btn-copy" onclick="copyResult('breakdown')">复制结果</button>
+      </div>
+    </div>
+
+    <!-- ⑦ 编导专栏 -->
+    <div class="panel" id="panel-director">
+      <div class="panel-title">🎬 编导专栏</div>
+      <div class="panel-desc">输入拍摄信息，AI 生成完整的拍摄方案和镜头建议</div>
+      <div class="card">
+        <label>视频主题</label>
+        <input type="text" id="dir-topic" placeholder="例如：记录一天的咖啡师工作日常">
+
+        <label>拍摄场景</label>
+        <select id="dir-scene">
+          {% for s in scenes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+        </select>
+
+        <label>可用设备（可多选）</label>
+        <div class="checkbox-group" id="dir-equipment">
+          {% for e in equipment %}
+          <label class="checkbox-label" onclick="toggleCheck(this)"><input type="checkbox" value="{{ e }}"> {{ e }}</label>
+          {% endfor %}
+        </div>
+
+        <button class="btn-primary" onclick="submit('director')">生成拍摄方案</button>
+      </div>
+      <div class="result-card" id="result-director">
+        <div class="result-label">AI 拍摄方案</div>
+        <div class="result-content" id="content-director"></div>
+        <button class="btn-copy" onclick="copyResult('director')">复制结果</button>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- ── 手机底部导航 ── -->
+  <div class="bottom-nav">
+    <div class="bottom-nav-item active" onclick="switchPanel('positioning', this)">
+      <span class="b-icon">🎯</span><span class="b-label">定位</span>
+    </div>
+    <div class="bottom-nav-item" onclick="switchPanel('viral', this)">
+      <span class="b-icon">🔥</span><span class="b-label">爆款选题</span>
+    </div>
+    <div class="bottom-nav-item" onclick="switchPanel('monetize', this)">
+      <span class="b-icon">💰</span><span class="b-label">变现</span>
+    </div>
+    <div class="bottom-nav-item" onclick="switchPanel('script', this)">
+      <span class="b-icon">📝</span><span class="b-label">脚本</span>
+    </div>
+    <div class="bottom-nav-item" onclick="switchPanel('rewrite', this)">
+      <span class="b-icon">✏️</span><span class="b-label">二创</span>
+    </div>
+    <div class="bottom-nav-item" onclick="switchPanel('breakdown', this)">
+      <span class="b-icon">🔍</span><span class="b-label">拆解</span>
+    </div>
+    <div class="bottom-nav-item" onclick="switchPanel('director', this)">
+      <span class="b-icon">🎬</span><span class="b-label">编导</span>
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<script>
+  // ── 面板切换 ──────────────────────────────────────────────────────────────
+  function switchPanel(name, el) {
+    // 面板
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+
+    // 侧边栏高亮
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    // 底部导航高亮
+    document.querySelectorAll('.bottom-nav-item').forEach(n => n.classList.remove('active'));
+
+    if (el) el.classList.add('active');
+
+    // 滚回顶部
+    document.getElementById('main-scroll').scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── 多选标签 ──────────────────────────────────────────────────────────────
+  function toggleCheck(label) {
+    event.preventDefault();
+    label.classList.toggle('checked');
+    label.querySelector('input').checked = label.classList.contains('checked');
+  }
+
+  function getCheckedValues(groupId) {
+    return Array.from(document.querySelectorAll('#' + groupId + ' input:checked')).map(i => i.value);
+  }
+
+  // ── 提交 ──────────────────────────────────────────────────────────────────
+  const API_MAP = {
+    positioning: '/api/positioning',
+    viral:       '/api/topics/viral',
+    monetize:    '/api/topics/monetize',
+    script:      '/api/script',
+    rewrite:     '/api/rewrite',
+    breakdown:   '/api/breakdown',
+    director:    '/api/director',
+  };
+
+  function getPayload(name) {
+    switch (name) {
+      case 'positioning': return {
+        industry:  document.getElementById('pos-industry').value,
+        strengths: document.getElementById('pos-strengths').value,
+        resources: getCheckedValues('pos-resources'),
+        platforms: getCheckedValues('pos-platforms'),
+      };
+      case 'viral': return {
+        industry: document.getElementById('viral-industry').value,
+        platform: document.getElementById('viral-platform').value,
+      };
+      case 'monetize': return {
+        industry:  document.getElementById('mon-industry').value,
+        followers: document.getElementById('mon-followers').value,
+      };
+      case 'script': return {
+        topic:    document.getElementById('script-topic').value,
+        type:     document.getElementById('script-type').value,
+        style:    document.getElementById('script-style').value,
+        duration: parseInt(document.getElementById('script-duration').value),
+      };
+      case 'rewrite':   return { original: document.getElementById('rewrite-original').value };
+      case 'breakdown': return {
+        title:   document.getElementById('bd-title').value,
+        content: document.getElementById('bd-content').value,
+      };
+      case 'director': return {
+        topic:     document.getElementById('dir-topic').value,
+        scene:     document.getElementById('dir-scene').value,
+        equipment: getCheckedValues('dir-equipment'),
+      };
+    }
+  }
+
+  async function submit(name) {
+    const btn = document.querySelector('#panel-' + name + ' .btn-primary');
+    const resultCard = document.getElementById('result-' + name);
+    const contentEl  = document.getElementById('content-' + name);
+    const origText   = btn.textContent;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>AI 生成中...';
+    resultCard.classList.remove('show');
+
+    try {
+      const res = await fetch(API_MAP[name], {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getPayload(name)),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      contentEl.textContent = data.content;
+      resultCard.classList.add('show');
+
+      // 手机端滚到结果
+      setTimeout(() => resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    } catch (e) {
+      alert('生成失败：' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = origText;
+    }
+  }
+
+  function copyResult(name) {
+    const text = document.getElementById('content-' + name).textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      alert('已复制到剪贴板');
+    }).catch(() => {
+      // 兼容不支持 clipboard API 的情况
+      const el = document.createElement('textarea');
+      el.value = text;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      alert('已复制到剪贴板');
+    });
+  }
+</script>
+</body>
+</html>
