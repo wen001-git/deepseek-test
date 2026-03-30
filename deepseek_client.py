@@ -21,3 +21,18 @@ def generate_text(system_prompt: str, user_prompt: str) -> str:
         ],
     )
     return response.choices[0].message.content
+
+
+def generate_stream(system_prompt: str, user_prompt: str, model: str = None):
+    stream = client.chat.completions.create(
+        model=model or MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+        stream=True,
+    )
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content
+        if delta:
+            yield delta

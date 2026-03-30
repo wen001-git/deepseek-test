@@ -64,14 +64,42 @@ RESOURCES = ["愿意出镜", "不愿意出镜", "专业摄影设备", "只有手
 
 PLATFORMS = ["抖音", "快手", "小红书", "视频号", "B站"]
 
+ACCOUNT_TYPES = [
+    "个人IP（个人品牌打造）",
+    "企业账号（企业形象展示）",
+    "品牌账号（品牌推广营销）",
+    "机构账号（MCN/工作室）",
+]
 
-def build_positioning_prompt(industry: str, strengths: str, resources: list, platforms: list) -> str:
+CONTENT_STYLES = [
+    "干货知识", "搞笑娱乐", "生活记录", "情感共鸣",
+    "种草带货", "励志正能量", "剧情故事", "测评分享",
+    "才艺展示", "萌宠可爱", "亲子互动", "旅行探索",
+    "美食制作", "时尚穿搭", "健康养生", "职场技巧",
+    "科普知识", "悬疑反转", "挑战实验", "游戏解说",
+]
+
+CONTENT_FORMATS = [
+    "口播", "情景剧", "教程", "Vlog", "测评",
+    "图文", "探店", "开箱", "街头采访", "混剪", "动画/插画", "多形式",
+]
+
+
+def build_positioning_prompt(industry: str, strengths: str, resources: list, platforms: list,
+                             account_types: list = None, content_styles: list = None,
+                             content_formats: list = None) -> str:
     resources_str = "、".join(resources) if resources else "未填写"
     platforms_str = "、".join(platforms) if platforms else "未填写"
+    account_types_str = "、".join(account_types) if account_types else "未填写"
+    content_styles_str = "、".join(content_styles) if content_styles else "未填写"
+    content_formats_str = "、".join(content_formats) if content_formats else "未填写"
     return f"""请根据以下信息，为这位创作者制定短视频账号定位方案：
 
 行业和领域：{industry}
 特长和优势：{strengths}
+账号类型：{account_types_str}
+内容风格偏好：{content_styles_str}
+内容形式偏好：{content_formats_str}
 可用资源：{resources_str}
 目标平台：{platforms_str}
 
@@ -81,8 +109,54 @@ def build_positioning_prompt(industry: str, strengths: str, resources: list, pla
 3. 【差异化优势】：与同赛道其他账号相比，这位创作者的独特之处
 4. 【目标人群】：描述最可能关注该账号的人群画像
 5. 【起步建议】：新账号冷启动的 3 条实操建议
+6. 【发展建议】：3-6 个月的阶段性成长目标和策略（分阶段描述：第1个月、第2-3个月、第4-6个月各应专注什么，达到什么里程碑）
 
 请直接输出，语言通俗易懂。"""
+
+
+# ─── 内容规划 ────────────────────────────────────────────────────────────────
+
+CONTENT_PLAN_SYSTEM_PROMPT = """你是一位短视频内容运营专家，擅长为创作者制定科学的内容发布计划。
+你的方案要：
+- 结合创作者的实际时间和资源，给出可执行的排期
+- 内容类型搭配合理，兼顾涨粉、互动、变现
+- 输出严格符合要求的 JSON 格式，不要附加任何解释文字
+"""
+
+DAILY_HOURS_OPTIONS = ["< 1小时", "1-2小时", "2-4小时", "4小时以上"]
+
+
+def build_content_plan_prompt(industry: str, platform: str, followers: str, daily_hours: str) -> str:
+    return f"""请为以下创作者制定30天内容发布计划，严格以 JSON 格式输出，不要有任何额外文字：
+
+行业/领域：{industry}
+目标平台：{platform}
+当前粉丝量：{followers}
+每天可用创作时间：{daily_hours}
+
+输出以下 JSON 结构（key 名称完全一致）：
+{{
+  "daily_count": <每天发几条，整数>,
+  "best_post_times": ["HH:MM", ...],
+  "type_distribution": [
+    {{"name": "内容类型名", "days": <天数，整数>, "ratio": <百分比整数，不带%>}}
+  ],
+  "weekly_template": [
+    {{"day": "周一", "type": "内容类型名", "theme": "该类型具体选题示例"}}
+  ],
+  "growth_advice": "针对当前粉丝阶段的发展建议，50-80字",
+  "reasons": {{
+    "posting_time": "解释为什么选这几个发布时间点，结合平台用户活跃规律和该行业受众习惯，2-3句",
+    "content_mix": "解释为什么做这样的内容类型配比，每种类型的作用（涨粉/互动/变现/留存），2-3句",
+    "weekly_rhythm": "解释一周排期的逻辑，为什么某些类型放在工作日/周末，节奏如何帮助账号成长，2-3句"
+  }}
+}}
+
+要求：
+- type_distribution 中各 days 之和 = 30，ratio 之和 = 100
+- weekly_template 包含周一到周日共7条，theme 写具体可执行的选题方向
+- best_post_times 给出 2-3 个最佳发布时间点
+- reasons 中每条 2-3 句，语言通俗，让普通创作者能看懂"""
 
 
 # ─── 爆款选题 ────────────────────────────────────────────────────────────────
