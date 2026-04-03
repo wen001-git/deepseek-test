@@ -257,6 +257,13 @@
       <div class="nav-item" onclick="switchPanel('breakdown', this)"><span class="icon">🔍</span> 爆款拆解</div>
       <div class="nav-item" onclick="switchPanel('director', this)"><span class="icon">🎬</span> 编导专栏</div>
     </div>
+    <div style="margin-top:auto; padding: 16px 20px; border-top: 1px solid #2d2d4e;">
+      <div style="font-size:12px; color:#666; margin-bottom:10px;">{{ session.get('username', '') }}</div>
+      {% if session.get('role') == 'admin' %}
+      <a href="/admin" style="display:block; font-size:13px; color:#a5b4fc; text-decoration:none; margin-bottom:8px;">⚙️ 用户管理</a>
+      {% endif %}
+      <a href="/logout" style="display:block; font-size:13px; color:#666; text-decoration:none;">退出登录</a>
+    </div>
   </div>
 
   <!-- ── 内容区 ── -->

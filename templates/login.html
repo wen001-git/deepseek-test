@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>登录 — 短视频创作助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f0f2f5; min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .login-box {
+      background: #fff; border-radius: 18px; padding: 40px 36px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10); width: 100%; max-width: 380px;
+    }
+    .logo { text-align: center; margin-bottom: 28px; }
+    .logo h1 { font-size: 20px; color: #1a1a2e; font-weight: 700; }
+    .logo p { font-size: 13px; color: #999; margin-top: 4px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; margin-top: 18px; }
+    label:first-of-type { margin-top: 0; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #e5e7eb;
+      border-radius: 10px; font-size: 15px; outline: none;
+      font-family: inherit; background: #fafafa; color: #333;
+      transition: border 0.2s;
+    }
+    input:focus { border-color: #6366f1; background: #fff; }
+    .btn-login {
+      width: 100%; margin-top: 24px; padding: 14px;
+      background: #6366f1; color: #fff; border: none;
+      border-radius: 12px; font-size: 16px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background 0.2s;
+    }
+    .btn-login:hover { background: #4f46e5; }
+    .btn-login:active { background: #4338ca; }
+    .error {
+      margin-top: 16px; padding: 10px 14px;
+      background: #fef2f2; border-left: 3px solid #ef4444;
+      border-radius: 0 8px 8px 0; color: #dc2626; font-size: 13px;
+    }
+    .hint { margin-top: 14px; font-size: 12px; color: #bbb; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <div class="logo">
+      <h1>短视频创作助手</h1>
+      <p>AI 驱动的创作工具</p>
+    </div>
+
+    <form method="POST" action="/login" id="login-form">
+      <input type="hidden" name="device_fingerprint" id="device_fingerprint" value="unknown">
+
+      <label>用户名</label>
+      <input type="text" name="username" placeholder="请输入用户名" autocomplete="username" required>
+
+      <label>密码</label>
+      <input type="password" name="password" placeholder="请输入密码" autocomplete="current-password" required>
+
+      <button type="submit" class="btn-login">登录</button>
+    </form>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <p class="hint">如无账号，请联系管理员获取</p>
+  </div>
+
+  <script>
+    // FingerprintJS — 生成稳定设备指纹
+    (function() {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js';
+      script.onload = function() {
+        FingerprintJS.load().then(fp => fp.get()).then(result => {
+          document.getElementById('device_fingerprint').value = result.visitorId;
+        });
+      };
+      document.head.appendChild(script);
+    })();
+  </script>
+</body>
+</html>

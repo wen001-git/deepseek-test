@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-Hans-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>用户管理 — 短视频创作助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #f0f2f5; color: #333; min-height: 100vh; }
+
+    .topbar {
+      background: #1a1a2e; color: #fff; padding: 0 24px;
+      display: flex; align-items: center; justify-content: space-between; height: 56px;
+    }
+    .topbar h1 { font-size: 16px; font-weight: 600; }
+    .topbar-right { display: flex; gap: 12px; align-items: center; }
+    .topbar a { color: #a5b4fc; font-size: 13px; text-decoration: none; }
+    .topbar a:hover { color: #fff; }
+
+    .container { max-width: 900px; margin: 32px auto; padding: 0 16px; }
+
+    /* 新增用户卡片 */
+    .card { background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); margin-bottom: 20px; }
+    .card-title { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; }
+    .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .form-group { flex: 1; min-width: 140px; }
+    .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
+    .form-group input { width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: inherit; background: #fafafa; color: #333; outline: none; }
+    .form-group input:focus { border-color: #6366f1; background: #fff; }
+    .btn-add { padding: 10px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+    .btn-add:hover { background: #4f46e5; }
+
+    .error { margin-top: 12px; padding: 8px 12px; background: #fef2f2; border-left: 3px solid #ef4444; border-radius: 0 6px 6px 0; color: #dc2626; font-size: 13px; }
+
+    /* 用户列表 */
+    .user-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .user-table th { background: #f8f8ff; padding: 10px 12px; text-align: left; border-bottom: 2px solid #e5e7eb; font-weight: 600; color: #555; }
+    .user-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    .user-table tr:last-child td { border-bottom: none; }
+    .user-table tr:hover td { background: #fafafa; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+    .badge-admin { background: #ede9fe; color: #6d28d9; }
+    .badge-user  { background: #f0fdf4; color: #15803d; }
+
+    .device-count { font-weight: 700; color: #6366f1; }
+    .device-count.full { color: #ef4444; }
+
+    /* 备注 inline edit */
+    .notes-cell { display: flex; align-items: center; gap: 6px; }
+    .notes-text { flex: 1; color: #555; font-size: 12px; min-width: 80px; }
+    .notes-input { flex: 1; padding: 4px 8px; border: 1.5px solid #e5e7eb; border-radius: 6px; font-size: 12px; font-family: inherit; color: #333; background: #fafafa; outline: none; display: none; }
+    .notes-input:focus { border-color: #6366f1; background: #fff; }
+    .btn-edit-notes { font-size: 11px; color: #aaa; cursor: pointer; background: none; border: none; padding: 2px 4px; }
+    .btn-edit-notes:hover { color: #6366f1; }
+
+    .btn-danger { padding: 5px 10px; background: #fff; color: #ef4444; border: 1px solid #fca5a5; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .btn-danger:hover { background: #fef2f2; }
+    .btn-clear  { padding: 5px 10px; background: #fff; color: #6366f1; border: 1px solid #a5b4fc; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+    .btn-clear:hover { background: #ede9fe; }
+
+    .stat-bar { display: flex; gap: 20px; margin-bottom: 20px; }
+    .stat { background: #fff; border-radius: 12px; padding: 14px 20px; flex: 1; box-shadow: 0 1px 6px rgba(0,0,0,0.07); }
+    .stat-num { font-size: 28px; font-weight: 700; color: #6366f1; }
+    .stat-label { font-size: 12px; color: #888; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>用户管理</h1>
+  <div class="topbar-right">
+    <span style="color:#888;font-size:13px">{{ current_user }}</span>
+    <a href="/">← 返回主界面</a>
+    <a href="/logout">退出登录</a>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 统计 -->
+  <div class="stat-bar">
+    <div class="stat">
+      <div class="stat-num">{{ users | length }}</div>
+      <div class="stat-label">账号总数</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">{{ users | selectattr('is_active', 'equalto', 1) | list | length }}</div>
+      <div class="stat-label">活跃账号</div>
+    </div>
+  </div>
+
+  <!-- 新增用户 -->
+  <div class="card">
+    <div class="card-title">新增用户</div>
+    <form method="POST" action="/admin/users/add">
+      <div class="form-row">
+        <div class="form-group">
+          <label>用户名 *</label>
+          <input type="text" name="username" placeholder="如：client_zhang" required>
+        </div>
+        <div class="form-group">
+          <label>密码 *</label>
+          <input type="password" name="password" placeholder="初始密码" required>
+        </div>
+        <div class="form-group">
+          <label>备注（选填）</label>
+          <input type="text" name="notes" placeholder="如：客户A - 北京">
+        </div>
+        <button type="submit" class="btn-add">+ 添加</button>
+      </div>
+    </form>
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+  </div>
+
+  <!-- 用户列表 -->
+  <div class="card">
+    <div class="card-title">用户列表</div>
+    <table class="user-table">
+      <thead>
+        <tr>
+          <th>用户名</th>
+          <th>备注</th>
+          <th>角色</th>
+          <th>已绑设备</th>
+          <th>创建时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td><strong>{{ u.username }}</strong></td>
+          <td>
+            <div class="notes-cell">
+              <span class="notes-text" id="notes-text-{{ u.id }}">{{ u.notes or '—' }}</span>
+              <input class="notes-input" id="notes-input-{{ u.id }}" value="{{ u.notes or '' }}"
+                     onblur="saveNotes({{ u.id }})" onkeydown="if(event.key==='Enter')saveNotes({{ u.id }})">
+              <button class="btn-edit-notes" onclick="editNotes({{ u.id }})" title="编辑备注">✏️</button>
+            </div>
+          </td>
+          <td><span class="badge badge-{{ u.role }}">{{ u.role }}</span></td>
+          <td>
+            <span class="device-count {% if u.device_count >= 3 %}full{% endif %}">
+              {{ u.device_count }} / 3
+            </span>
+          </td>
+          <td style="color:#999;font-size:12px">{{ u.created_at[:10] }}</td>
+          <td>
+            {% if u.role != 'admin' %}
+            <form method="POST" action="/admin/users/clear-devices/{{ u.id }}" style="display:inline">
+              <button class="btn-clear" type="submit" onclick="return confirm('清除该用户所有设备记录？')">清除设备</button>
+            </form>
+            <form method="POST" action="/admin/users/delete/{{ u.id }}" style="display:inline">
+              <button class="btn-danger" type="submit" onclick="return confirm('确认删除用户 {{ u.username }}？')">删除</button>
+            </form>
+            {% else %}
+            <span style="color:#ccc;font-size:12px">管理员</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  function editNotes(id) {
+    document.getElementById('notes-text-' + id).style.display = 'none';
+    const input = document.getElementById('notes-input-' + id);
+    input.style.display = 'block';
+    input.focus();
+  }
+
+  function saveNotes(id) {
+    const input = document.getElementById('notes-input-' + id);
+    const text = document.getElementById('notes-text-' + id);
+    const notes = input.value.trim();
+    fetch('/admin/users/notes/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes })
+    }).then(() => {
+      text.textContent = notes || '—';
+      input.style.display = 'none';
+      text.style.display = '';
+    });
+  }
+</script>
+</body>
+</html>

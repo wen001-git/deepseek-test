@@ -1,5 +1,9 @@
-from flask import Flask, request, jsonify, render_template, Response, stream_with_context
+import os
+from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
 from deepseek_client import generate_stream
+from database import init_db
+from auth import auth_bp
+from admin import admin_bp
 from prompts import (
     SCRIPT_SYSTEM_PROMPT, VIDEO_TYPES, STYLES, build_script_prompt,
     POSITIONING_SYSTEM_PROMPT, INDUSTRIES, RESOURCES, PLATFORMS,
@@ -13,6 +17,20 @@ from prompts import (
 )
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-change-in-production')
+
+app.register_blueprint(auth_bp)
+app.register_blueprint(admin_bp)
+
+init_db()
+
+@app.before_request
+def require_login():
+    public_paths = {'/login'}
+    if request.path in public_paths or request.path.startswith('/static'):
+        return
+    if not session.get('user_id'):
+        return redirect('/login')
 
 
 def stream_response(system_prompt, user_prompt, model):
