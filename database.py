@@ -16,6 +16,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
+            plain_password TEXT DEFAULT '',
             role TEXT NOT NULL DEFAULT 'user',
             is_active INTEGER NOT NULL DEFAULT 1,
             notes TEXT DEFAULT '',
@@ -31,12 +32,19 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
     """)
+    # 兼容旧库：尝试添加 plain_password 列（已存在则忽略）
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN plain_password TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass
+
     # 创建默认管理员账号（如果不存在）
     existing = conn.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
     if not existing:
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, notes) VALUES (?, ?, 'admin', '默认管理员')",
-            ('admin', generate_password_hash('admin123', method='pbkdf2:sha256'))
+            "INSERT INTO users (username, password_hash, plain_password, role, notes) VALUES (?, ?, ?, 'admin', '默认管理员')",
+            ('admin', generate_password_hash('admin123', method='pbkdf2:sha256'), 'admin123')
         )
     conn.commit()
     conn.close()
@@ -69,8 +77,8 @@ def create_user(username, password, role='user', notes=''):
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO users (username, password_hash, role, notes) VALUES (?, ?, ?, ?)",
-            (username, generate_password_hash(password, method='pbkdf2:sha256'), role, notes)
+            "INSERT INTO users (username, password_hash, plain_password, role, notes) VALUES (?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password, method='pbkdf2:sha256'), password, role, notes)
         )
         conn.commit()
         return True, None
@@ -107,11 +115,6 @@ def clear_user_devices(user_id):
     conn.close()
 
 def check_and_register_device(user_id, ip, fingerprint):
-    """
-    检查设备指纹是否在允许范围内，并注册新设备。
-    返回 (allowed: bool, reason: str)
-    IP 只记录日志，不参与限制判断。
-    """
     conn = get_db()
     devices = conn.execute(
         "SELECT device_fingerprint FROM user_devices WHERE user_id = ?",
@@ -120,7 +123,6 @@ def check_and_register_device(user_id, ip, fingerprint):
     fingerprints = [d['device_fingerprint'] for d in devices]
 
     if fingerprint in fingerprints:
-        # 已注册设备，更新 last_seen 和 IP
         conn.execute(
             "UPDATE user_devices SET last_seen = CURRENT_TIMESTAMP, ip_address = ? WHERE user_id = ? AND device_fingerprint = ?",
             (ip, user_id, fingerprint)
@@ -133,7 +135,6 @@ def check_and_register_device(user_id, ip, fingerprint):
         conn.close()
         return False, '该账号已在 3 台设备上登录，请联系管理员解绑设备后再试'
 
-    # 新设备且未超限，注册
     conn.execute(
         "INSERT INTO user_devices (user_id, ip_address, device_fingerprint) VALUES (?, ?, ?)",
         (user_id, ip, fingerprint)

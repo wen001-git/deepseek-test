@@ -19,7 +19,8 @@ def admin_required(f):
 @admin_required
 def admin_panel():
     users = get_all_users()
-    return render_template('admin.html', users=users, current_user=session.get('username'))
+    devices_map = {u['id']: get_user_devices(u['id']) for u in users}
+    return render_template('admin.html', users=users, devices_map=devices_map, current_user=session.get('username'))
 
 @admin_bp.route('/admin/users/add', methods=['POST'])
 @admin_required
@@ -30,12 +31,14 @@ def add_user():
     if not username or not password:
         users = get_all_users()
         return render_template('admin.html', users=users,
+                               devices_map={u['id']: get_user_devices(u['id']) for u in users},
                                current_user=session.get('username'),
                                error='用户名和密码不能为空')
     ok, err = create_user(username, password, notes=notes)
     if not ok:
         users = get_all_users()
         return render_template('admin.html', users=users,
+                               devices_map={u['id']: get_user_devices(u['id']) for u in users},
                                current_user=session.get('username'),
                                error=err)
     return redirect('/admin')
