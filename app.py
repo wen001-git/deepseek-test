@@ -2,6 +2,7 @@ import os
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
 from deepseek_client import generate_stream
 from database import init_db
+from search_client import search_bilibili, fetch_video_from_url
 from auth import auth_bp
 from admin import admin_bp
 from prompts import (
@@ -12,6 +13,7 @@ from prompts import (
     MONETIZE_TOPIC_SYSTEM_PROMPT, FOLLOWER_RANGES, build_monetize_topic_prompt,
     REWRITE_SYSTEM_PROMPT, build_rewrite_prompt,
     BREAKDOWN_SYSTEM_PROMPT, build_breakdown_prompt,
+    IMITATE_SYSTEM_PROMPT, build_imitate_prompt,
     DIRECTOR_SYSTEM_PROMPT, SCENES, EQUIPMENT, build_director_prompt,
     CONTENT_PLAN_SYSTEM_PROMPT, DAILY_HOURS_OPTIONS, build_content_plan_prompt,
 )
@@ -143,6 +145,45 @@ def api_breakdown():
         return jsonify({"error": "请输入视频标题"}), 400
     prompt = build_breakdown_prompt(title, data.get("content", ""))
     return stream_response(BREAKDOWN_SYSTEM_PROMPT, prompt, data.get("model"))
+
+
+# ─── 爆款仿写 ────────────────────────────────────────────────────────────────
+
+@app.route("/api/imitate", methods=["POST"])
+def api_imitate():
+    data = request.get_json()
+    ref_title = data.get("ref_title", "").strip()
+    my_topic  = data.get("my_topic", "").strip()
+    if not ref_title or not my_topic:
+        return jsonify({"error": "请填写参考视频标题和你的话题"}), 400
+    prompt = build_imitate_prompt(
+        ref_title,
+        data.get("ref_content", ""),
+        my_topic,
+        data.get("style", "幽默"),
+        int(data.get("duration", 60)),
+    )
+    return stream_response(IMITATE_SYSTEM_PROMPT, prompt, data.get("model"))
+
+
+@app.route("/api/search-viral", methods=["POST"])
+def api_search_viral():
+    data = request.get_json()
+    topic = data.get("topic", "").strip()
+    if not topic:
+        return jsonify({"results": [], "error": "请输入搜索关键词"}), 400
+    results, error = search_bilibili(topic)
+    return jsonify({"results": results, "error": error})
+
+
+@app.route("/api/fetch-url", methods=["POST"])
+def api_fetch_url():
+    data = request.get_json()
+    url = data.get("url", "").strip()
+    if not url:
+        return jsonify({"result": None, "error": "请输入视频链接"}), 400
+    result, error = fetch_video_from_url(url)
+    return jsonify({"result": result, "error": error})
 
 
 # ─── 编导专栏 ────────────────────────────────────────────────────────────────
