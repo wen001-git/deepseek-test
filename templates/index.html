@@ -241,6 +241,30 @@
   .bd-section-title { font-size: 13px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; }
   .btn-imitate { padding: 8px 16px; background: #ede9fe; color: #6d28d9; border: 1.5px solid #c4b5fd; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; }
   .btn-imitate:hover { background: #ddd6fe; }
+
+  /* ── 账号规划 Workflow Stepper ── */
+  .workflow-stepper { display:flex; align-items:center; margin-bottom:24px; }
+  .wf-step { display:flex; flex-direction:column; align-items:center; gap:4px; flex:0 0 auto; }
+  .wf-circle { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; transition:all 0.4s; }
+  .wf-step.pending .wf-circle { background:#f3f4f6; color:#9ca3af; border:2px solid #e5e7eb; }
+  .wf-step.active  .wf-circle { background:#6366f1; color:#fff; box-shadow:0 0 0 4px #e0e7ff; animation:wf-pulse 1.5s infinite; }
+  .wf-step.done    .wf-circle { background:#16a34a; color:#fff; }
+  .wf-label { font-size:12px; font-weight:600; color:#374151; }
+  .wf-sub   { font-size:11px; color:#9ca3af; }
+  .wf-step.active .wf-label { color:#6366f1; }
+  .wf-step.done   .wf-label { color:#16a34a; }
+  .wf-step.done   .wf-sub   { color:#16a34a; }
+  .wf-connector { flex:1; height:2px; background:#e5e7eb; margin:0 10px 20px; transition:background 0.5s; }
+  .wf-connector.done { background:#16a34a; }
+  @keyframes wf-pulse { 0%,100%{box-shadow:0 0 0 4px #e0e7ff} 50%{box-shadow:0 0 0 8px #c7d2fe} }
+  .wf-step2-wrapper { position:relative; margin-top:8px; }
+  .wf-lock-overlay { position:absolute; inset:0; background:rgba(248,250,252,0.88); border-radius:16px; display:flex; align-items:center; justify-content:center; z-index:10; font-size:14px; color:#9ca3af; gap:8px; backdrop-filter:blur(1px); }
+  .wf-step2-wrapper.unlocked .wf-lock-overlay { display:none; }
+  .wf-step2-wrapper.unlocked { animation:wf-slidein 0.5s ease; }
+  .wf-step-divider { display:flex; align-items:center; gap:12px; margin:24px 0 16px; }
+  .wf-step-divider-label { font-size:13px; font-weight:700; color:#6366f1; white-space:nowrap; }
+  .wf-step-divider-line { flex:1; height:1px; background:#e5e7eb; }
+  @keyframes wf-slidein { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
   </style>
   <script src="/static/js/marked.min.js"></script>
 </head>
@@ -258,8 +282,7 @@
     </div>
     <div class="nav-group">
       <div class="nav-group-title">账号规划</div>
-      <div class="nav-item active" onclick="switchPanel('positioning', this)"><span class="icon">🎯</span> 定位分析</div>
-      <div class="nav-item" onclick="switchPanel('content-plan', this)"><span class="icon">📅</span> 内容规划</div>
+      <div class="nav-item active" onclick="switchPanel('positioning', this)"><span class="icon">🗺️</span> 账号规划</div>
       <div class="nav-item" onclick="switchPanel('viral', this)"><span class="icon">🔥</span> 爆款选题</div>
       <div class="nav-item" onclick="switchPanel('monetize', this)"><span class="icon">💰</span> 变现选题</div>
     </div>
@@ -288,8 +311,29 @@
 
     <!-- ① 定位分析 -->
     <div class="panel active" id="panel-positioning">
-      <div class="panel-title">🎯 定位分析</div>
-      <div class="panel-desc">填写你的基本情况，AI 为你制定精准的账号定位方案</div>
+      <div class="panel-title">🗺️ 账号规划工作流</div>
+      <div class="panel-desc">两步完成账号规划：先定位方向，再制定内容计划</div>
+
+      <!-- Stepper -->
+      <div class="workflow-stepper">
+        <div class="wf-step active" id="wf-step-1">
+          <div class="wf-circle" id="wf-circle-1">①</div>
+          <div class="wf-label">定位分析</div>
+          <div class="wf-sub" id="wf-sub-1">当前步骤</div>
+        </div>
+        <div class="wf-connector" id="wf-connector"></div>
+        <div class="wf-step pending" id="wf-step-2">
+          <div class="wf-circle" id="wf-circle-2">②</div>
+          <div class="wf-label">内容规划</div>
+          <div class="wf-sub" id="wf-sub-2">完成上一步解锁</div>
+        </div>
+      </div>
+
+      <!-- Step 1 divider -->
+      <div class="wf-step-divider">
+        <div class="wf-step-divider-label">Step 1 · 定位分析</div>
+        <div class="wf-step-divider-line"></div>
+      </div>
       <div class="card">
         <div class="label-row">
           <label>① 行业和领域</label>
@@ -356,7 +400,75 @@
           <button class="btn-copy" onclick="copyResult('positioning')">复制结果</button>
         </div>
       </div>
-    </div>
+
+      <!-- ── Step 2: 内容规划 (locked until Step 1 done) ── -->
+      <div class="wf-step2-wrapper" id="wf-step2-wrapper">
+        <div class="wf-lock-overlay">🔒 完成定位分析后自动解锁</div>
+
+        <div class="wf-step-divider">
+          <div class="wf-step-divider-label">Step 2 · 内容规划</div>
+          <div class="wf-step-divider-line"></div>
+        </div>
+
+        <div class="card">
+          <label>① 行业和领域 <span style="font-size:11px;color:#16a34a;font-weight:400">（已从上一步自动填入）</span></label>
+          <input type="text" id="cp-industry" list="cp-industry-list" placeholder="选择或直接输入，如：美食、健身、职场...">
+          <datalist id="cp-industry-list">
+            {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
+          </datalist>
+
+          <label>② 目标平台</label>
+          <select id="cp-platform">
+            {% for p in platforms %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+          </select>
+
+          <div class="row">
+            <div>
+              <label>③ 当前粉丝量</label>
+              <select id="cp-followers">
+                {% for f in follower_ranges %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <label>④ 每天可创作时间</label>
+              <select id="cp-hours">
+                {% for h in daily_hours_options %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="btn-group">
+            <button class="btn-primary" onclick="submitContentPlan('deepseek-chat')">⚡ 快速规划</button>
+            <button class="btn-secondary" onclick="submitContentPlan('deepseek-reasoner')">🧠 深度规划</button>
+          </div>
+        </div>
+
+        <div class="card" id="cp-result" style="display:none">
+          <div class="cp-meta" id="cp-meta"></div>
+          <div id="cp-reason-time"></div>
+          <div class="cp-section">
+            <div class="cp-section-title">📊 内容类型分布</div>
+            <div id="cp-distribution"></div>
+            <div id="cp-reason-mix"></div>
+          </div>
+          <div class="cp-section">
+            <div class="cp-section-title">📅 30天内容日历</div>
+            <div class="cal-tooltip empty" id="cp-tooltip">点击任意日期查看当日主题</div>
+            <div class="calendar-grid" id="cp-calendar"></div>
+          </div>
+          <div class="cp-section">
+            <div class="cp-section-title">📋 一周内容模板</div>
+            <table class="weekly-table" id="cp-weekly"></table>
+            <div id="cp-reason-weekly"></div>
+          </div>
+          <div class="cp-section">
+            <div class="cp-section-title">🚀 发展建议</div>
+            <div class="growth-box" id="cp-growth"></div>
+          </div>
+        </div>
+      </div><!-- /wf-step2-wrapper -->
+
+    </div><!-- /panel-positioning -->
 
     <!-- ② 爆款选题 -->
     <div class="panel" id="panel-viral">
@@ -659,81 +771,15 @@
       </div>
     </div>
 
-    <!-- ⑧ 内容规划 -->
-    <div class="panel" id="panel-content-plan">
-      <div class="panel-title">📅 内容规划</div>
-      <div class="panel-desc">AI 为你制定30天内容日历、最佳发布时间和内容类型分配方案</div>
-      <div class="card">
-        <label>① 行业和领域</label>
-        <input type="text" id="cp-industry" list="cp-industry-list" placeholder="选择或直接输入，如：美食、健身、职场...">
-        <datalist id="cp-industry-list">
-          {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
-        </datalist>
-
-        <label>② 目标平台</label>
-        <select id="cp-platform">
-          {% for p in platforms %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
-        </select>
-
-        <div class="row">
-          <div>
-            <label>③ 当前粉丝量</label>
-            <select id="cp-followers">
-              {% for f in follower_ranges %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
-            </select>
-          </div>
-          <div>
-            <label>④ 每天可创作时间</label>
-            <select id="cp-hours">
-              {% for h in daily_hours_options %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
-            </select>
-          </div>
-        </div>
-
-        <div class="btn-group">
-          <button class="btn-primary" onclick="submitContentPlan('deepseek-chat')">⚡ 快速规划</button>
-          <button class="btn-secondary" onclick="submitContentPlan('deepseek-reasoner')">🧠 深度规划</button>
-        </div>
-      </div>
-
-      <div class="card" id="cp-result" style="display:none">
-        <div class="cp-meta" id="cp-meta"></div>
-        <div id="cp-reason-time"></div>
-
-        <div class="cp-section">
-          <div class="cp-section-title">📊 内容类型分布</div>
-          <div id="cp-distribution"></div>
-          <div id="cp-reason-mix"></div>
-        </div>
-
-        <div class="cp-section">
-          <div class="cp-section-title">📅 30天内容日历</div>
-          <div class="cal-tooltip empty" id="cp-tooltip">点击任意日期查看当日主题</div>
-          <div class="calendar-grid" id="cp-calendar"></div>
-        </div>
-
-        <div class="cp-section">
-          <div class="cp-section-title">📋 一周内容模板</div>
-          <table class="weekly-table" id="cp-weekly"></table>
-          <div id="cp-reason-weekly"></div>
-        </div>
-
-        <div class="cp-section">
-          <div class="cp-section-title">🚀 发展建议</div>
-          <div class="growth-box" id="cp-growth"></div>
-        </div>
-      </div>
-    </div>
+    <!-- ⑧ 内容规划 (merged into panel-positioning workflow) -->
+    <div class="panel" id="panel-content-plan" style="display:none"></div>
 
   </div><!-- /main -->
 
   <!-- ── 手机底部导航 ── -->
   <div class="bottom-nav">
     <div class="bottom-nav-item active" onclick="switchPanel('positioning', this)">
-      <span class="b-icon">🎯</span><span class="b-label">定位</span>
-    </div>
-    <div class="bottom-nav-item" onclick="switchPanel('content-plan', this)">
-      <span class="b-icon">📅</span><span class="b-label">内容规划</span>
+      <span class="b-icon">🗺️</span><span class="b-label">账号规划</span>
     </div>
     <div class="bottom-nav-item" onclick="switchPanel('viral', this)">
       <span class="b-icon">🔥</span><span class="b-label">爆款选题</span>
@@ -886,6 +932,34 @@
   const resultStore = {};
   PANELS.forEach(p => resultStore[p] = { 'deepseek-chat': null, 'deepseek-reasoner': null });
 
+  let _positioningResult = '';
+
+  function unlockStep2(resultText) {
+    _positioningResult = resultText;
+    // Update stepper
+    const circle1 = document.getElementById('wf-circle-1');
+    const step1   = document.getElementById('wf-step-1');
+    const conn    = document.getElementById('wf-connector');
+    const step2   = document.getElementById('wf-step-2');
+    const sub2    = document.getElementById('wf-sub-2');
+    const sub1    = document.getElementById('wf-sub-1');
+    if (circle1) circle1.textContent = '✓';
+    if (step1)   step1.className = 'wf-step done';
+    if (sub1)    sub1.textContent = '已完成';
+    if (conn)    conn.className = 'wf-connector done';
+    if (step2)   step2.className = 'wf-step active';
+    if (sub2)    sub2.textContent = '进行中';
+    // Unlock Step 2
+    const wrapper = document.getElementById('wf-step2-wrapper');
+    if (wrapper) wrapper.classList.add('unlocked');
+    // Auto-fill industry
+    const posInd = document.getElementById('pos-industry');
+    const cpInd  = document.getElementById('cp-industry');
+    if (posInd && cpInd) cpInd.value = posInd.value;
+    // Scroll to Step 2
+    setTimeout(() => { if (wrapper) wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 400);
+  }
+
   function switchResultTab(name, model, btn) {
     document.querySelectorAll(`#result-${name} .result-tab`).forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
@@ -946,6 +1020,8 @@
       }
       // 存入 store
       resultStore[name][model] = fullText;
+      // 定位分析完成 → 解锁 Step 2
+      if (name === 'positioning') unlockStep2(fullText);
     } catch (e) {
       alert('生成失败：' + e.message);
     } finally {
@@ -962,7 +1038,7 @@
     const platform = document.getElementById('cp-platform').value;
     if (!industry) { alert('请填写行业和领域'); return; }
     const clickedBtn = event.currentTarget;
-    const allBtns = document.querySelectorAll('#panel-content-plan .btn-primary, #panel-content-plan .btn-secondary');
+    const allBtns = document.querySelectorAll('#wf-step2-wrapper .btn-primary, #wf-step2-wrapper .btn-secondary');
     const origText = clickedBtn.textContent;
     allBtns.forEach(b => b.disabled = true);
     clickedBtn.innerHTML = '<span class="spinner"></span>生成中 0 字...';
@@ -976,6 +1052,7 @@
           platform,
           followers: document.getElementById('cp-followers').value,
           daily_hours: document.getElementById('cp-hours').value,
+          positioning_result: _positioningResult,
           model,
         }),
       });

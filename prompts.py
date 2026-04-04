@@ -126,13 +126,14 @@ CONTENT_PLAN_SYSTEM_PROMPT = """你是一位短视频内容运营专家，擅长
 DAILY_HOURS_OPTIONS = ["< 1小时", "1-2小时", "2-4小时", "4小时以上"]
 
 
-def build_content_plan_prompt(industry: str, platform: str, followers: str, daily_hours: str) -> str:
+def build_content_plan_prompt(industry: str, platform: str, followers: str, daily_hours: str, positioning_result: str = '') -> str:
+    pos_section = f"\n\n【定位分析参考】（请结合以下定位分析结果制定内容规划）：\n{positioning_result.strip()}" if positioning_result.strip() else ""
     return f"""请为以下创作者制定30天内容发布计划，严格以 JSON 格式输出，不要有任何额外文字：
 
 行业/领域：{industry}
 目标平台：{platform}
 当前粉丝量：{followers}
-每天可用创作时间：{daily_hours}
+每天可用创作时间：{daily_hours}{pos_section}
 
 输出以下 JSON 结构（key 名称完全一致）：
 {{

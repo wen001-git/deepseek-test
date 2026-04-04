@@ -228,6 +228,7 @@ def api_content_plan():
         platform,
         data.get("followers", "0 - 1千"),
         data.get("daily_hours", "1-2小时"),
+        data.get("positioning_result", ""),
     )
     return stream_response(CONTENT_PLAN_SYSTEM_PROMPT, prompt, data.get("model"))
 
