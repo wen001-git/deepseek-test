@@ -2,7 +2,7 @@ import os
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
 from deepseek_client import generate_stream
 from database import init_db
-from search_client import search_bilibili, fetch_video_from_url
+from search_client import search_bilibili, search_youtube, fetch_video_from_url
 from auth import auth_bp
 from admin import admin_bp
 from prompts import (
@@ -172,7 +172,10 @@ def api_search_viral():
     topic = data.get("topic", "").strip()
     if not topic:
         return jsonify({"results": [], "error": "请输入搜索关键词"}), 400
-    results, error = search_bilibili(topic)
+    bili_results, bili_error = search_bilibili(topic)
+    yt_results,   yt_error   = search_youtube(topic)
+    results = bili_results + yt_results
+    error   = None if results else (bili_error or yt_error or "未找到相关视频")
     return jsonify({"results": results, "error": error})
 
 

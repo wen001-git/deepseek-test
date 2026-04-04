@@ -1,5 +1,9 @@
+import os
 import re
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BILIBILI_SEARCH_URL = "https://api.bilibili.com/x/web-interface/search/type"
 BILIBILI_VIEW_URL   = "https://api.bilibili.com/x/web-interface/view"
@@ -9,6 +13,11 @@ BILIBILI_HEADERS = {
     "Referer": "https://www.bilibili.com",
 }
 
+YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
+YOUTUBE_STATS_URL  = "https://www.googleapis.com/youtube/v3/videos"
+
+
+# ── 通用工具 ──────────────────────────────────────────────────────────────────
 
 def _fmt_play(n) -> str:
     try:
@@ -29,6 +38,8 @@ def _strip_html(text: str) -> str:
 def _detect_platform(url: str) -> str:
     if "bilibili.com" in url or "b23.tv" in url:
         return "B站"
+    if "youtube.com" in url or "youtu.be" in url:
+        return "YouTube"
     if "douyin.com" in url or "iesdouyin.com" in url:
         return "抖音"
     if "xiaohongshu" in url or "xhslink" in url:
@@ -41,6 +52,11 @@ def _detect_platform(url: str) -> str:
 def _extract_bvid(url: str):
     m = re.search(r"BV[\w]+", url)
     return m.group(0) if m else None
+
+
+def _extract_youtube_id(url: str):
+    m = re.search(r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})", url)
+    return m.group(1) if m else None
 
 
 # ── B站关键词搜索 ─────────────────────────────────────────────────────────────
@@ -63,10 +79,10 @@ def search_bilibili(topic: str) -> tuple:
             return [], "B站搜索暂时不可用，请稍后重试"
 
         results = []
-        for item in data.get("data", {}).get("result", [])[:8]:
-            title = _strip_html(item.get("title", "（无标题）"))
-            bvid  = item.get("bvid", "")
-            play  = _fmt_play(item.get("play", 0))
+        for item in data.get("data", {}).get("result", [])[:6]:
+            title  = _strip_html(item.get("title", "（无标题）"))
+            bvid   = item.get("bvid", "")
+            play   = _fmt_play(item.get("play", 0))
             author = item.get("author", "")
             results.append({
                 "title":    title,
@@ -81,16 +97,73 @@ def search_bilibili(topic: str) -> tuple:
         return results, None
 
     except requests.Timeout:
-        return [], "搜索超时，请稍后重试"
+        return [], "B站搜索超时，请稍后重试"
     except Exception as e:
-        return [], f"搜索失败：{e}"
+        return [], f"B站搜索失败：{e}"
+
+
+# ── YouTube 关键词搜索 ────────────────────────────────────────────────────────
+
+def search_youtube(topic: str) -> tuple:
+    """Returns (list[{title,url,snippet,platform,source}], error_str|None)"""
+    api_key = os.getenv("YOUTUBE_API_KEY")
+    if not api_key:
+        return [], None  # 未配置时静默跳过
+
+    try:
+        resp = requests.get(YOUTUBE_SEARCH_URL, params={
+            "part":             "snippet",
+            "q":                topic,
+            "type":             "video",
+            "maxResults":       6,
+            "relevanceLanguage":"zh",
+            "key":              api_key,
+        }, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        if "error" in data:
+            return [], f"YouTube API 错误：{data['error'].get('message', '')}"
+        items = data.get("items", [])
+        if not items:
+            return [], None
+    except requests.Timeout:
+        return [], "YouTube 搜索超时"
+    except Exception as e:
+        return [], f"YouTube 搜索失败：{e}"
+
+    # 获取播放量
+    video_ids = [i["id"]["videoId"] for i in items]
+    stats = {}
+    try:
+        sr = requests.get(YOUTUBE_STATS_URL, params={
+            "part": "statistics",
+            "id":   ",".join(video_ids),
+            "key":  api_key,
+        }, timeout=8)
+        for v in sr.json().get("items", []):
+            stats[v["id"]] = v.get("statistics", {})
+    except Exception:
+        pass
+
+    results = []
+    for item in items:
+        vid  = item["id"]["videoId"]
+        s    = item["snippet"]
+        play = _fmt_play(stats.get(vid, {}).get("viewCount", ""))
+        results.append({
+            "title":    s.get("title", "（无标题）"),
+            "url":      f"https://www.youtube.com/watch?v={vid}",
+            "snippet":  f"▶ {play} 播放  ·  {s.get('channelTitle', '')}",
+            "platform": "YouTube",
+            "source":   "real",
+        })
+    return results, None
 
 
 # ── URL 解析 ──────────────────────────────────────────────────────────────────
 
 def fetch_video_from_url(url: str) -> tuple:
     """
-    Try to fetch video metadata from a URL.
     Returns ({title, url, snippet, platform, source}, error_str|None)
     """
     platform = _detect_platform(url)
@@ -119,7 +192,33 @@ def fetch_video_from_url(url: str) -> tuple:
                 pass
         return None, "无法解析该 B站链接，请检查 URL 是否正确"
 
-    # Non-Bilibili URL — return minimal info so the user can fill in the title manually
+    if platform == "YouTube":
+        vid     = _extract_youtube_id(url)
+        api_key = os.getenv("YOUTUBE_API_KEY")
+        if vid and api_key:
+            try:
+                sr = requests.get(YOUTUBE_STATS_URL, params={
+                    "part": "snippet,statistics",
+                    "id":   vid,
+                    "key":  api_key,
+                }, timeout=8)
+                items = sr.json().get("items", [])
+                if items:
+                    v    = items[0]
+                    play = _fmt_play(v.get("statistics", {}).get("viewCount", ""))
+                    sn   = v.get("snippet", {})
+                    return {
+                        "title":    sn.get("title", ""),
+                        "url":      f"https://www.youtube.com/watch?v={vid}",
+                        "snippet":  f"▶ {play} 播放  ·  {sn.get('channelTitle', '')}",
+                        "platform": "YouTube",
+                        "source":   "real",
+                    }, None
+            except Exception:
+                pass
+        return None, "无法解析该 YouTube 链接，请检查链接或确认已配置 YOUTUBE_API_KEY"
+
+    # 其他平台 — 返回最小信息，让用户手动填写标题
     return {
         "title":    "",
         "url":      url,

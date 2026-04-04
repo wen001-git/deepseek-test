@@ -504,9 +504,9 @@
 
         <!-- 方式一：粘贴视频链接 -->
         <div class="bd-section-title">方式一：粘贴视频链接</div>
-        <p class="hint" style="margin-bottom:8px">支持 B站链接自动获取标题；其他平台请手动补填标题</p>
+        <p class="hint" style="margin-bottom:8px">支持 B站 / YouTube 链接自动获取标题；其他平台请手动补填标题</p>
         <div style="display:flex; gap:8px; align-items:flex-start;">
-          <input type="text" id="bd-url" placeholder="https://www.bilibili.com/video/BV..." style="flex:1; margin-bottom:0">
+          <input type="text" id="bd-url" placeholder="B站或 YouTube 视频链接..." style="flex:1; margin-bottom:0">
           <button class="btn-secondary" id="bd-fetch-btn" onclick="fetchVideoUrl()" style="white-space:nowrap; padding:10px 14px">解析</button>
         </div>
         <div id="bd-fetch-result" style="margin-top:10px"></div>
@@ -519,10 +519,10 @@
         </div>
 
         <!-- 方式二：B站关键词搜索 -->
-        <div class="bd-section-title">方式二：B站关键词搜索</div>
+        <div class="bd-section-title">方式二：关键词搜索（B站 + YouTube）</div>
         <input type="text" id="bd-topic" placeholder="例如：健身减脂、职场干货、美食探店...">
         <div id="bd-search-error"></div>
-        <button class="btn-primary" id="bd-search-btn" style="margin-top:4px" onclick="searchViralVideos()">🔍 搜索 B站爆款</button>
+        <button class="btn-primary" id="bd-search-btn" style="margin-top:4px" onclick="searchViralVideos()">🔍 搜索爆款视频</button>
 
         <!-- 分隔 -->
         <div style="margin-top:20px; padding-top:18px; border-top:1px dashed #e5e7eb;">
@@ -1121,7 +1121,7 @@
   // ── 爆款拆解：搜索流程 ────────────────────────────────────────────────────
 
   const BD_PLATFORM_COLORS = {
-    '抖音': '#000', '小红书': '#ff2442', 'B站': '#00a1d6', '视频号': '#07c160', '其他': '#888'
+    '抖音': '#000', '小红书': '#ff2442', 'B站': '#00a1d6', '视频号': '#07c160', 'YouTube': '#ff0000', '其他': '#888'
   };
 
   function escapeHtml(str) {
@@ -1232,8 +1232,13 @@
 
       const list = document.getElementById('bd-results-list');
       list.innerHTML = '';
+      const bCount = data.results.filter(r => r.platform === 'B站').length;
+      const yCount = data.results.filter(r => r.platform === 'YouTube').length;
+      const metaParts = [];
+      if (bCount) metaParts.push(`${bCount} 条 B站视频`);
+      if (yCount) metaParts.push(`${yCount} 条 YouTube 视频`);
       document.getElementById('bd-results-meta').textContent =
-        `找到 ${data.results.length} 条 B站视频，点击选择后自动开始分析`;
+        metaParts.join(' + ') + '，点击选择后自动开始分析';
 
       data.results.forEach(item => {
         let domain = item.url;
