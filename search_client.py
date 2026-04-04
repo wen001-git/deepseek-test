@@ -1,7 +1,13 @@
 import os
 import re
+import time
 import requests
 from dotenv import load_dotenv
+try:
+    from youtube_transcript_api import YouTubeTranscriptApi
+    _YT_TRANSCRIPT_AVAILABLE = True
+except ImportError:
+    _YT_TRANSCRIPT_AVAILABLE = False
 
 load_dotenv()
 
@@ -15,6 +21,25 @@ BILIBILI_HEADERS = {
 
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
 YOUTUBE_STATS_URL  = "https://www.googleapis.com/youtube/v3/videos"
+
+_yt_cache: dict = {}   # keyword -> (results, error, timestamp)
+YT_CACHE_TTL = 3600    # 1 hour
+
+TRANSCRIPT_MAX_CHARS = 2000
+
+
+def _fetch_yt_transcript(vid: str):
+    """Fetch YouTube transcript. Returns joined text string or None."""
+    if not _YT_TRANSCRIPT_AVAILABLE:
+        return None
+    try:
+        segs = YouTubeTranscriptApi.get_transcript(
+            vid, languages=['zh-Hans', 'zh-Hant', 'zh', 'en']
+        )
+        text = " ".join(s['text'] for s in segs)
+        return text[:TRANSCRIPT_MAX_CHARS]
+    except Exception:
+        return None
 
 
 # ── 通用工具 ──────────────────────────────────────────────────────────────────
@@ -67,7 +92,6 @@ def search_bilibili(topic: str) -> tuple:
         "search_type": "video",
         "keyword":     topic,
         "order":       "click",
-        "duration":    1,
         "page":        1,
     }
     try:
@@ -79,7 +103,7 @@ def search_bilibili(topic: str) -> tuple:
             return [], "B站搜索暂时不可用，请稍后重试"
 
         results = []
-        for item in data.get("data", {}).get("result", [])[:6]:
+        for item in data.get("data", {}).get("result", [])[:5]:
             title  = _strip_html(item.get("title", "（无标题）"))
             bvid   = item.get("bvid", "")
             play   = _fmt_play(item.get("play", 0))
@@ -109,6 +133,11 @@ def search_youtube(topic: str) -> tuple:
     api_key = os.getenv("YOUTUBE_API_KEY")
     if not api_key:
         return [], None  # 未配置时静默跳过
+
+    # 命中缓存直接返回，节省 API 配额
+    cached = _yt_cache.get(topic)
+    if cached and time.time() - cached[2] < YT_CACHE_TTL:
+        return cached[0], cached[1]
 
     try:
         resp = requests.get(YOUTUBE_SEARCH_URL, params={
@@ -146,7 +175,7 @@ def search_youtube(topic: str) -> tuple:
         pass
 
     results = []
-    for item in items:
+    for item in items[:5]:
         vid  = item["id"]["videoId"]
         s    = item["snippet"]
         play = _fmt_play(stats.get(vid, {}).get("viewCount", ""))
@@ -157,6 +186,7 @@ def search_youtube(topic: str) -> tuple:
             "platform": "YouTube",
             "source":   "real",
         })
+    _yt_cache[topic] = (results, None, time.time())
     return results, None
 
 
@@ -207,12 +237,14 @@ def fetch_video_from_url(url: str) -> tuple:
                     v    = items[0]
                     play = _fmt_play(v.get("statistics", {}).get("viewCount", ""))
                     sn   = v.get("snippet", {})
+                    transcript = _fetch_yt_transcript(vid)
                     return {
-                        "title":    sn.get("title", ""),
-                        "url":      f"https://www.youtube.com/watch?v={vid}",
-                        "snippet":  f"▶ {play} 播放  ·  {sn.get('channelTitle', '')}",
-                        "platform": "YouTube",
-                        "source":   "real",
+                        "title":      sn.get("title", ""),
+                        "url":        f"https://www.youtube.com/watch?v={vid}",
+                        "snippet":    f"▶ {play} 播放  ·  {sn.get('channelTitle', '')}",
+                        "platform":   "YouTube",
+                        "source":     "real",
+                        "transcript": transcript,
                     }, None
             except Exception:
                 pass

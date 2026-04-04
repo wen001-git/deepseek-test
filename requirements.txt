@@ -3,3 +3,4 @@ openai==2.30.0
 python-dotenv==1.2.1
 gunicorn==23.0.0
 requests>=2.31.0
+youtube-transcript-api>=0.6.0

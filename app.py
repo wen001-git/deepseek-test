@@ -174,9 +174,16 @@ def api_search_viral():
         return jsonify({"results": [], "error": "请输入搜索关键词"}), 400
     bili_results, bili_error = search_bilibili(topic)
     yt_results,   yt_error   = search_youtube(topic)
-    results = bili_results + yt_results
+    # 交叉排名：B站[0], YT[0], B站[1], YT[1], ...
+    results = []
+    for i in range(max(len(bili_results), len(yt_results))):
+        if i < len(bili_results):
+            results.append(bili_results[i])
+        if i < len(yt_results):
+            results.append(yt_results[i])
     error   = None if results else (bili_error or yt_error or "未找到相关视频")
-    return jsonify({"results": results, "error": error})
+    warning = bili_error if (bili_error and yt_results) else None
+    return jsonify({"results": results, "error": error, "warning": warning})
 
 
 @app.route("/api/fetch-url", methods=["POST"])
