@@ -364,9 +364,10 @@
       <div class="panel-desc">输入你的赛道，AI 生成 10 个有爆款潜力的选题</div>
       <div class="card">
         <label>账号赛道</label>
-        <select id="viral-industry">
-          {% for ind in industries %}<option value="{{ ind }}">{{ ind }}</option>{% endfor %}
-        </select>
+        <input type="text" id="viral-industry" list="viral-industry-list" placeholder="选择或输入赛道，例如：健身、美食、职场...">
+        <datalist id="viral-industry-list">
+          {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
+        </datalist>
 
         <label>发布平台</label>
         <select id="viral-platform">
