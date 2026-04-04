@@ -28,9 +28,11 @@ def login():
             error = '用户名或密码错误'
         elif not user['is_active']:
             error = '账号已被禁用，请联系管理员'
+        elif fingerprint == 'unknown':
+            error = '设备识别失败，请刷新页面后重试'
         else:
             ip = get_client_ip()
-            allowed, reason = check_and_register_device(user['id'], ip, fingerprint)
+            allowed, reason = check_and_register_device(user['id'], ip, fingerprint, user['role'])
             if not allowed:
                 error = reason
             else:

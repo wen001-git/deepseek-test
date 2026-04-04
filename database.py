@@ -2,9 +2,10 @@ import sqlite3
 import os
 from werkzeug.security import generate_password_hash
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'users.db')
+DB_PATH = os.getenv('DB_PATH', os.path.join(os.path.dirname(__file__), 'users.db'))
 
 def get_db():
+    os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -114,7 +115,7 @@ def clear_user_devices(user_id):
     conn.commit()
     conn.close()
 
-def check_and_register_device(user_id, ip, fingerprint):
+def check_and_register_device(user_id, ip, fingerprint, role='user'):
     conn = get_db()
     devices = conn.execute(
         "SELECT device_fingerprint FROM user_devices WHERE user_id = ?",
@@ -131,7 +132,7 @@ def check_and_register_device(user_id, ip, fingerprint):
         conn.close()
         return True, 'ok'
 
-    if len(fingerprints) >= 3:
+    if role != 'admin' and len(fingerprints) >= 3:
         conn.close()
         return False, '该账号已在 3 台设备上登录，请联系管理员解绑设备后再试'
 
@@ -142,3 +143,13 @@ def check_and_register_device(user_id, ip, fingerprint):
     conn.commit()
     conn.close()
     return True, 'ok'
+
+
+def update_user_password(user_id, new_password):
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET password_hash = ?, plain_password = ? WHERE id = ?",
+        (generate_password_hash(new_password, method='pbkdf2:sha256'), new_password, user_id)
+    )
+    conn.commit()
+    conn.close()

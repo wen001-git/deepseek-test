@@ -73,7 +73,7 @@
     // FingerprintJS — 生成稳定设备指纹
     (function() {
       const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js';
+      script.src = '/static/js/fp.min.js';
       script.onload = function() {
         FingerprintJS.load().then(fp => fp.get()).then(result => {
           document.getElementById('device_fingerprint').value = result.visitorId;

@@ -186,16 +186,23 @@
           </td>
           <td style="color:#999;font-size:12px">{{ u.created_at[:10] }}</td>
           <td>
-            {% if u.role != 'admin' %}
-            <form method="POST" action="/admin/users/clear-devices/{{ u.id }}" style="display:inline">
-              <button class="btn-clear" type="submit" onclick="return confirm('清除该用户所有设备记录？')">清除设备</button>
-            </form>
-            <form method="POST" action="/admin/users/delete/{{ u.id }}" style="display:inline">
-              <button class="btn-danger" type="submit" onclick="return confirm('确认删除用户 {{ u.username }}？')">删除</button>
-            </form>
-            {% else %}
-            <span style="color:#ccc;font-size:12px">管理员</span>
-            {% endif %}
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <!-- 改密 (所有用户包括管理员) -->
+              <button class="btn-clear" onclick="editPassword({{ u.id }})">改密</button>
+              <input id="pwd-input-{{ u.id }}" type="text" placeholder="新密码"
+                style="display:none;width:80px;padding:3px 6px;border:1px solid #6366f1;border-radius:4px;font-size:12px"
+                onkeydown="if(event.key==='Enter')savePassword({{ u.id }})">
+              <button id="pwd-save-{{ u.id }}" style="display:none;background:#6366f1;color:#fff;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:12px"
+                onclick="savePassword({{ u.id }})">✓</button>
+              {% if u.role != 'admin' %}
+              <form method="POST" action="/admin/users/clear-devices/{{ u.id }}" style="display:inline">
+                <button class="btn-clear" type="submit" onclick="return confirm('清除该用户所有设备记录？')">清除设备</button>
+              </form>
+              <form method="POST" action="/admin/users/delete/{{ u.id }}" style="display:inline">
+                <button class="btn-danger" type="submit" onclick="return confirm('确认删除用户 {{ u.username }}？')">删除</button>
+              </form>
+              {% endif %}
+            </div>
           </td>
         </tr>
         <!-- 设备详情展开行 -->
@@ -278,6 +285,36 @@
     const btn = document.getElementById('dev-btn-' + id);
     const open = row.classList.toggle('open');
     btn.textContent = open ? '▼ 详情' : '▶ 详情';
+  }
+
+  function editPassword(id) {
+    const input = document.getElementById('pwd-input-' + id);
+    const saveBtn = document.getElementById('pwd-save-' + id);
+    input.style.display = 'inline-block';
+    saveBtn.style.display = 'inline-block';
+    input.focus();
+  }
+
+  async function savePassword(id) {
+    const input = document.getElementById('pwd-input-' + id);
+    const val = input.value.trim();
+    if (!val) return;
+    const r = await fetch('/admin/users/password/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: val })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      input.style.display = 'none';
+      document.getElementById('pwd-save-' + id).style.display = 'none';
+      input.value = '';
+      // update the visible plain password display if present
+      const pwdSpan = document.getElementById('pwd-' + id);
+      if (pwdSpan) { pwdSpan.dataset.plain = val; pwdSpan.textContent = '••••••••'; pwdSpan.dataset.hidden = '1'; }
+    } else {
+      alert(data.error || '修改失败');
+    }
   }
 </script>
 </body>

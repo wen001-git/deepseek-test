@@ -28,11 +28,16 @@ init_db()
 
 @app.before_request
 def require_login():
-    public_paths = {'/login'}
+    public_paths = {'/login', '/ping'}
     if request.path in public_paths or request.path.startswith('/static'):
         return
     if not session.get('user_id'):
         return redirect('/login')
+
+
+@app.route('/ping')
+def ping():
+    return 'ok', 200
 
 
 def stream_response(system_prompt, user_prompt, model):
