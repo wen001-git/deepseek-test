@@ -1,8 +1,9 @@
 import os
+import re
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
 from deepseek_client import generate_stream
 from database import init_db
-from search_client import search_bilibili, search_youtube, fetch_video_from_url
+from search_client import search_bilibili, search_youtube, search_weixin_video, fetch_video_from_url, fetch_video_content
 from auth import auth_bp
 from admin import admin_bp
 from prompts import (
@@ -12,7 +13,7 @@ from prompts import (
     VIRAL_TOPIC_SYSTEM_PROMPT, build_viral_topic_prompt,
     MONETIZE_TOPIC_SYSTEM_PROMPT, FOLLOWER_RANGES, build_monetize_topic_prompt,
     REWRITE_SYSTEM_PROMPT, build_rewrite_prompt,
-    BREAKDOWN_SYSTEM_PROMPT, build_breakdown_prompt,
+    BREAKDOWN_SYSTEM_PROMPT, build_breakdown_prompt, build_breakdown_sharetext_prompt,
     IMITATE_SYSTEM_PROMPT, build_imitate_prompt,
     DIRECTOR_SYSTEM_PROMPT, SCENES, EQUIPMENT, build_director_prompt,
     CONTENT_PLAN_SYSTEM_PROMPT, DAILY_HOURS_OPTIONS, build_content_plan_prompt,
@@ -113,7 +114,13 @@ def api_topics_viral():
     industry = data.get("industry", "").strip()
     if not industry:
         return jsonify({"error": "请选择赛道领域"}), 400
-    prompt = build_viral_topic_prompt(industry, data.get("platform", "抖音"))
+    prompt = build_viral_topic_prompt(
+        industry,
+        data.get("strengths", ""),
+        data.get("platform", "抖音"),
+        data.get("content_direction", ""),
+        data.get("viral_elements", []),
+    )
     return stream_response(VIRAL_TOPIC_SYSTEM_PROMPT, prompt, data.get("model"))
 
 
@@ -125,7 +132,7 @@ def api_topics_monetize():
     industry = data.get("industry", "").strip()
     if not industry:
         return jsonify({"error": "请选择赛道领域"}), 400
-    prompt = build_monetize_topic_prompt(industry, data.get("followers", "0 - 1千"))
+    prompt = build_monetize_topic_prompt(industry, data.get("followers", "0 - 1千"), data.get("strengths", ""))
     return stream_response(MONETIZE_TOPIC_SYSTEM_PROMPT, prompt, data.get("model"))
 
 
@@ -179,16 +186,34 @@ def api_search_viral():
         return jsonify({"results": [], "error": "请输入搜索关键词"}), 400
     bili_results, bili_error = search_bilibili(topic)
     yt_results,   yt_error   = search_youtube(topic)
-    # 交叉排名：B站[0], YT[0], B站[1], YT[1], ...
+    wx_results,   wx_error   = search_weixin_video(topic)
+    # 交叉排名：B站, YT, 视频号 循环交叉
     results = []
-    for i in range(max(len(bili_results), len(yt_results))):
-        if i < len(bili_results):
-            results.append(bili_results[i])
-        if i < len(yt_results):
-            results.append(yt_results[i])
-    error   = None if results else (bili_error or yt_error or "未找到相关视频")
-    warning = bili_error if (bili_error and yt_results) else None
+    for i in range(max(len(bili_results), len(yt_results), len(wx_results))):
+        if i < len(bili_results): results.append(bili_results[i])
+        if i < len(yt_results):   results.append(yt_results[i])
+        if i < len(wx_results):   results.append(wx_results[i])
+    error = None if results else (bili_error or yt_error or wx_error or "未找到相关视频")
+    warnings = []
+    if bili_error and (yt_results or wx_results): warnings.append(f"B站：{bili_error}")
+    if wx_error  and (bili_results or yt_results): warnings.append(f"视频号：{wx_error}")
+    warning = "；".join(warnings) if warnings else None
     return jsonify({"results": results, "error": error, "warning": warning})
+
+
+@app.route("/api/breakdown-sharetext", methods=["POST"])
+def api_breakdown_sharetext():
+    data = request.get_json()
+    sharetext = data.get("sharetext", "").strip()
+    if not sharetext:
+        return jsonify({"error": "请粘贴视频链接或分享文案"}), 400
+    fetched_content = None
+    url_match = re.search(r'https?://\S+', sharetext)
+    if url_match:
+        fetched_content = fetch_video_content(url_match.group(0), sharetext=sharetext)
+    prompt = build_breakdown_sharetext_prompt(sharetext, fetched_content or '')
+    system = BREAKDOWN_SYSTEM_PROMPT if fetched_content else ""
+    return stream_response(system, prompt, data.get("model"))
 
 
 @app.route("/api/fetch-url", methods=["POST"])
@@ -229,6 +254,7 @@ def api_content_plan():
         data.get("followers", "0 - 1千"),
         data.get("daily_hours", "1-2小时"),
         data.get("positioning_result", ""),
+        data.get("target_audience", ""),
     )
     return stream_response(CONTENT_PLAN_SYSTEM_PROMPT, prompt, data.get("model"))
 

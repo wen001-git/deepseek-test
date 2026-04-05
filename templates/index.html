@@ -32,6 +32,14 @@
     .btn-secondary:hover { background: #ede9fe; }
     .btn-secondary:active { background: #ddd6fe; }
     .btn-secondary:disabled { border-color: #a5b4fc; color: #a5b4fc; cursor: not-allowed; background: #fff; }
+    .chip { display: inline-block; padding: 5px 12px; border-radius: 20px; border: 1.5px solid #c7d2fe; background: #f0f0ff; color: #4338ca; font-size: 13px; cursor: pointer; transition: all 0.15s; user-select: none; -webkit-user-select: none; }
+    .chip.selected { background: #6366f1; color: #fff; border-color: #6366f1; }
+    .viral-topic-card { background: #f8f8ff; border-left: 3px solid #6366f1; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 12px; }
+    .viral-topic-title { font-weight: 600; color: #1a1a2e; line-height: 1.6; }
+    .viral-topic-reason { font-weight: 400; color: #555; margin-top: 6px; line-height: 1.6; }
+    .nav-result-dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; margin-left: auto; flex-shrink: 0; }
+    .viral-script-btn { display: inline-block; margin-top: 8px; padding: 4px 14px; background: #ede9fe; color: #6d28d9; border: 1.5px solid #c4b5fd; border-radius: 20px; font-size: 12px; cursor: pointer; font-family: inherit; transition: background 0.15s; }
+    .viral-script-btn:hover { background: #ddd6fe; }
     .nav-group { padding: 12px 0; }
     .nav-group-title { font-size: 11px; color: #555; padding: 4px 20px 8px; letter-spacing: 0.5px; text-transform: uppercase; }
     .nav-item { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-size: 14px; transition: all 0.15s; border-left: 3px solid transparent; }
@@ -206,12 +214,15 @@
     .cal-day-appear { animation: calPop 0.18s cubic-bezier(0.34,1.56,0.64,1) both; }
     @keyframes calPop { from { opacity:0; transform:scale(0.2); } to { opacity:1; transform:scale(1); } }
     .cal-tooltip { border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 8px; line-height: 1.6; background: #f0f4ff; border-left: 3px solid #6366f1; color: #333; min-height: 42px; }
+    .cal-tooltip .btn-goto-script { margin-top: 8px; display: inline-block; }
     .cal-tooltip.empty { color: #bbb; font-size: 12px; border-left-color: #e5e7eb; background: #fafafa; }
     .weekly-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .weekly-table th { background: #f8f8ff; padding: 8px 10px; text-align: left; border-bottom: 1px solid #e5e7eb; font-weight: 600; color: #444; font-size: 12px; }
     .weekly-table td { padding: 9px 10px; border-bottom: 1px solid #f0f0f0; color: #555; vertical-align: middle; }
     .weekly-table tr:last-child td { border-bottom: none; }
     .type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; color: #fff; }
+    .btn-goto-script { font-size: 11px; padding: 3px 10px; border-radius: 8px; border: 1.5px solid #c7d2fe; background: #f0f0ff; color: #6366f1; cursor: pointer; font-family: inherit; font-weight: 600; white-space: nowrap; transition: background 0.15s; }
+    .btn-goto-script:hover { background: #e0e7ff; }
     .growth-box { background: #f8f8ff; border-left: 3px solid #6366f1; border-radius: 0 10px 10px 0; padding: 14px 16px; font-size: 14px; line-height: 1.8; color: #444; }
     .reason-toggle { display: flex; align-items: center; gap: 5px; margin-top: 10px; font-size: 12px; color: #b45309; cursor: pointer; user-select: none; width: fit-content; background: #fef9c3; padding: 3px 10px; border-radius: 20px; }
     .reason-toggle .r-arrow { font-size: 10px; transition: transform 0.2s; display: inline-block; }
@@ -265,6 +276,12 @@
   .wf-step-divider-label { font-size:13px; font-weight:700; color:#6366f1; white-space:nowrap; }
   .wf-step-divider-line { flex:1; height:1px; background:#e5e7eb; }
   @keyframes wf-slidein { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
+  .btn-restore { background:#f0f0ff; color:#6366f1; border:1.5px solid #c7d2fe; border-radius:8px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit; font-weight:600; }
+  .btn-restore:hover { background:#e0e7ff; }
+  .history-chip { display:inline-flex; align-items:center; gap:4px; background:#f3f4f6; border:1px solid #e5e7eb; border-radius:20px; padding:3px 10px; font-size:12px; color:#555; cursor:pointer; max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .history-chip:hover { background:#e0e7ff; border-color:#a5b4fc; color:#4f46e5; }
+  .chip-del { color:#bbb; font-size:11px; margin-left:2px; flex-shrink:0; }
+  .chip-del:hover { color:#ef4444; }
   </style>
   <script src="/static/js/marked.min.js"></script>
 </head>
@@ -335,6 +352,9 @@
         <div class="wf-step-divider-line"></div>
       </div>
       <div class="card">
+        <div id="pos-restore-bar" style="display:none;margin-bottom:14px">
+          <button class="btn-restore" onclick="restoreLastInput()">📋 使用上次输入</button>
+        </div>
         <div class="label-row">
           <label>① 行业和领域</label>
           <button class="btn-field-copy" onclick="copyField('pos-industry')">复制</button>
@@ -349,6 +369,7 @@
           <button class="btn-field-copy" onclick="copyField('pos-strengths')">复制</button>
         </div>
         <textarea id="pos-strengths" placeholder="例如：我是厨师，有 10 年做菜经验，擅长家常菜&#10;或：我喜欢旅行，去过 30 个国家，擅长拍风景"></textarea>
+        <div id="pos-strengths-chips" style="display:none;margin-top:6px;gap:6px;flex-wrap:wrap"></div>
 
         <label>③ 账号类型（可多选）</label>
         <div class="checkbox-group" id="pos-account-types">
@@ -417,20 +438,23 @@
             {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
           </datalist>
 
-          <label>② 目标平台</label>
+          <label>② 目标人群 <span style="font-size:11px;color:#16a34a;font-weight:400">（已从定位分析自动提取，可修改）</span></label>
+          <textarea id="cp-target-audience" rows="3" style="width:100%;padding:10px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;resize:vertical;background:#fafafa;color:#333;outline:none;" placeholder="例如：25-35岁有出行需求的上班族，关注省钱攻略和小众目的地..."></textarea>
+
+          <label>③ 目标平台</label>
           <select id="cp-platform">
             {% for p in platforms %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
           </select>
 
           <div class="row">
             <div>
-              <label>③ 当前粉丝量</label>
+              <label>④ 当前粉丝量</label>
               <select id="cp-followers">
                 {% for f in follower_ranges %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
               </select>
             </div>
             <div>
-              <label>④ 每天可创作时间</label>
+              <label>⑤ 每天可创作时间</label>
               <select id="cp-hours">
                 {% for h in daily_hours_options %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
               </select>
@@ -475,16 +499,57 @@
       <div class="panel-title">🔥 爆款选题</div>
       <div class="panel-desc">输入你的赛道，AI 生成 10 个有爆款潜力的选题</div>
       <div class="card">
-        <label>账号赛道</label>
-        <input type="text" id="viral-industry" list="viral-industry-list" placeholder="选择或输入赛道，例如：健身、美食、职场...">
+        <div id="viral-restore-bar" style="display:none; margin-bottom:14px">
+          <button class="btn-restore" onclick="restoreViralLastInput()">📋 使用上次输入</button>
+        </div>
+
+        <div class="label-row">
+          <label>① 行业和领域</label>
+        </div>
+        <input type="text" id="viral-industry" list="viral-industry-list" placeholder="选择或直接输入，如：美食、宠物医疗、二次元...">
         <datalist id="viral-industry-list">
           {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
         </datalist>
 
-        <label>发布平台</label>
+        <div class="label-row" style="margin-top:12px">
+          <label>② 你的特长和优势</label>
+        </div>
+        <textarea id="viral-strengths" placeholder="例如：我是厨师，有 10 年做菜经验，擅长家常菜&#10;或：我喜欢旅行，去过 30 个国家，擅长拍风景"></textarea>
+        <div id="viral-strengths-chips" style="display:none;margin-top:6px;gap:6px;flex-wrap:wrap"></div>
+
+        <label style="margin-top:12px">发布平台</label>
         <select id="viral-platform">
           {% for p in platforms %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
         </select>
+
+        <!-- 精准选题方向（选填） -->
+        <div style="margin-top:12px;">
+          <div style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; -webkit-user-select:none;"
+               onclick="var p=document.getElementById('viral-direction-panel'); p.style.display=p.style.display==='none'?'block':'none'; this.querySelector('.chip-toggle-hint').textContent=p.style.display==='none'?'点击展开 ▾':'收起 ▴'">
+            <span style="font-size:13px; color:#6366f1; font-weight:600;">🎯 精准选题方向（选填）</span>
+            <span class="chip-toggle-hint" style="font-size:11px; color:#999;">收起 ▴</span>
+          </div>
+          <div id="viral-direction-panel" style="display:block; margin-top:10px;">
+            <div style="font-size:12px; color:#666; margin-bottom:6px;">内容方向（单选）</div>
+            <div id="viral-content-dir" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+              <span class="chip" onclick="toggleChipSingle(this,'viral-content-dir')">晒过程</span>
+              <span class="chip" onclick="toggleChipSingle(this,'viral-content-dir')">讲故事</span>
+              <span class="chip" onclick="toggleChipSingle(this,'viral-content-dir')">教知识</span>
+              <span class="chip" onclick="toggleChipSingle(this,'viral-content-dir')">聊观点</span>
+            </div>
+            <div style="font-size:12px; color:#666; margin-bottom:6px;">爆款元素（可多选）</div>
+            <div id="viral-elements" style="display:flex; flex-wrap:wrap; gap:8px;">
+              <span class="chip" onclick="toggleChipMulti(this)">成本的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">人群的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">奇葩的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">最差的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">怀旧的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">荷尔蒙的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">头牌的</span>
+              <span class="chip" onclick="toggleChipMulti(this)">颜值的</span>
+            </div>
+          </div>
+        </div>
 
         <div class="btn-group">
           <button class="btn-primary" onclick="submit('viral','deepseek-chat')">⚡ 快速生成</button>
@@ -508,12 +573,25 @@
       <div class="panel-title">💰 变现选题</div>
       <div class="panel-desc">结合你的赛道和粉丝量，AI 给出最适合你的变现路径和对应选题</div>
       <div class="card">
-        <label>账号赛道</label>
-        <select id="mon-industry">
-          {% for ind in industries %}<option value="{{ ind }}">{{ ind }}</option>{% endfor %}
-        </select>
+        <div id="mon-restore-bar" style="display:none; margin-bottom:14px">
+          <button class="btn-restore" onclick="restoreMonLastInput()">📋 使用上次输入</button>
+        </div>
 
-        <label>当前粉丝量</label>
+        <div class="label-row">
+          <label>① 行业和领域</label>
+        </div>
+        <input type="text" id="mon-industry" list="mon-industry-list" placeholder="选择或直接输入，如：美食、宠物医疗、二次元...">
+        <datalist id="mon-industry-list">
+          {% for ind in industries %}<option value="{{ ind }}">{% endfor %}
+        </datalist>
+
+        <div class="label-row" style="margin-top:12px">
+          <label>② 你的特长和优势</label>
+        </div>
+        <textarea id="mon-strengths" placeholder="例如：我是厨师，有 10 年做菜经验，擅长家常菜&#10;或：我喜欢旅行，去过 30 个国家，擅长拍风景"></textarea>
+        <div id="mon-strengths-chips" style="display:none;margin-top:6px;gap:6px;flex-wrap:wrap"></div>
+
+        <label style="margin-top:12px">当前粉丝量</label>
         <select id="mon-followers">
           {% for f in follower_ranges %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
         </select>
@@ -618,12 +696,38 @@
 
         <!-- 方式一：粘贴视频链接 -->
         <div class="bd-section-title">方式一：粘贴视频链接</div>
-        <p class="hint" style="margin-bottom:8px">支持 B站 / YouTube 链接自动获取标题；其他平台请手动补填标题</p>
-        <div style="display:flex; gap:8px; align-items:flex-start;">
-          <input type="text" id="bd-url" placeholder="B站或 YouTube 视频链接..." style="flex:1; margin-bottom:0">
-          <button class="btn-secondary" id="bd-fetch-btn" onclick="fetchVideoUrl()" style="white-space:nowrap; padding:10px 14px">解析</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <p class="hint" style="margin:0">B站/YouTube 粘贴链接即可 · 抖音请粘贴「复制链接」的链接或完整分享文案</p>
+          <button onclick="toggleUrlGuide()" style="background:none;border:none;color:#6366f1;font-size:12px;cursor:pointer;white-space:nowrap;padding:0 0 0 12px;font-family:inherit">❓ 如何获取链接</button>
+        </div>
+        <!-- 获取链接指引 -->
+        <div id="url-guide" style="display:none; background:#f8f8ff; border:1px solid #e0e7ff; border-radius:10px; padding:12px 14px; margin-bottom:10px; font-size:13px; line-height:1.8; color:#444;">
+          <div style="font-weight:600; color:#6366f1; margin-bottom:8px;">📋 各平台获取链接方法</div>
+          <div style="display:grid; gap:10px;">
+            <div>
+              <span style="font-weight:600;">🎵 抖音</span><br>
+              打开视频 → 点右下角「分享」→ 点「<strong>复制链接</strong>」→ 粘贴到上方输入框<br>
+              <span style="color:#888; font-size:12px;">也可直接粘贴抖音 App 内「分享」→「复制」生成的完整分享文案</span>
+            </div>
+            <div style="border-top:1px solid #e0e7ff; padding-top:10px;">
+              <span style="font-weight:600;">📺 B站 / YouTube</span><br>
+              直接复制浏览器地址栏链接粘贴即可
+            </div>
+          </div>
+        </div>
+        <input type="text" id="bd-url" placeholder="粘贴链接或抖音完整分享文案..." style="width:100%; margin-bottom:8px">
+        <div style="display:flex; gap:8px; align-items:stretch;">
+          <button class="btn-primary" id="bd-fetch-btn" onclick="fetchVideoUrl('deepseek-chat')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px; margin-top:0; width:auto">⚡ 解析</button>
+          <button class="btn-secondary" id="bd-fetch-btn-reasoner" onclick="fetchVideoUrl('deepseek-reasoner')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px">🧠 深度思考</button>
         </div>
         <div id="bd-fetch-result" style="margin-top:10px"></div>
+        <div id="bd-prompt-preview" style="display:none;margin-top:8px;background:#f8f8ff;border:1px solid #e0e7ff;border-radius:8px;padding:10px 12px;font-size:12px;color:#555;line-height:1.6">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-weight:600;color:#6366f1;font-size:11px">已发送的提示词</span>
+            <button onclick="copyBdPrompt()" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit">复制</button>
+          </div>
+          <div id="bd-prompt-text" style="white-space:pre-wrap;word-break:break-all"></div>
+        </div>
 
         <!-- 分隔 -->
         <div style="display:flex; align-items:center; gap:10px; margin:18px 0;">
@@ -633,7 +737,7 @@
         </div>
 
         <!-- 方式二：关键词搜索 -->
-        <div class="bd-section-title">方式二：关键词搜索（B站 + YouTube）</div>
+        <div class="bd-section-title">方式二：关键词搜索（B站 + YouTube + 视频号）</div>
         <div style="display:flex; gap:8px; align-items:flex-start;">
           <input type="text" id="bd-topic" placeholder="例如：健身减脂、职场干货、美食探店..." style="flex:1; min-width:0; margin-bottom:0">
           <button class="btn-primary" id="bd-search-btn" onclick="searchViralVideos()" style="white-space:nowrap; padding:10px 14px; flex-shrink:0; width:auto; margin-top:0">🔍 搜索</button>
@@ -853,9 +957,8 @@
       const match = Array.from(sel.options).find(o => o.value === src);
       if (match && sel.selectedIndex === 0) sel.value = src;
     } else if (targetPanel === 'monetize') {
-      const sel = document.getElementById('mon-industry');
-      const match = Array.from(sel.options).find(o => o.value === src);
-      if (match && sel.selectedIndex === 0) sel.value = src;
+      const el = document.getElementById('mon-industry');
+      if (!el.value) el.value = src;
     }
   }
 
@@ -893,14 +996,22 @@
         resources:       getCheckedValues('pos-resources'),
         platforms:      getCheckedValues('pos-platforms'),
       };
-      case 'viral': return {
-        industry: document.getElementById('viral-industry').value,
-        platform: document.getElementById('viral-platform').value,
-      };
-      case 'monetize': return {
-        industry:  document.getElementById('mon-industry').value,
-        followers: document.getElementById('mon-followers').value,
-      };
+      case 'viral':
+        saveViralHistory();
+        return {
+          industry:          document.getElementById('viral-industry').value,
+          strengths:         document.getElementById('viral-strengths').value,
+          platform:          document.getElementById('viral-platform').value,
+          content_direction: (document.querySelector('#viral-content-dir .chip.selected') || {}).textContent || '',
+          viral_elements:    [...document.querySelectorAll('#viral-elements .chip.selected')].map(c => c.textContent),
+        };
+      case 'monetize':
+        saveMonHistory();
+        return {
+          industry:  document.getElementById('mon-industry').value,
+          strengths: document.getElementById('mon-strengths').value,
+          followers: document.getElementById('mon-followers').value,
+        };
       case 'script': return {
         topic:    document.getElementById('script-topic').value,
         type:     document.getElementById('script-type').value,
@@ -956,6 +1067,22 @@
     const posInd = document.getElementById('pos-industry');
     const cpInd  = document.getElementById('cp-industry');
     if (posInd && cpInd) cpInd.value = posInd.value;
+    // Auto-fill target audience from 【目标人群】section
+    const taEl = document.getElementById('cp-target-audience');
+    if (taEl) {
+      const taIdx = resultText.indexOf('目标人群');
+      if (taIdx !== -1) {
+        const bracketEnd = resultText.indexOf('】', taIdx);
+        if (bracketEnd !== -1) {
+          // Skip past 】, optional closing markdown markers, colon, and whitespace
+          let rest = resultText.slice(bracketEnd + 1).replace(/^[\*\_]*[：:\s]*/, '');
+          // Stop at next section header (requires newline before 【)
+          const nextIdx = rest.search(/\n【|\n+\d+[\.、]/);
+          const extracted = (nextIdx === -1 ? rest : rest.slice(0, nextIdx)).trim();
+          if (extracted) taEl.value = extracted;
+        }
+      }
+    }
     // Scroll to Step 2
     setTimeout(() => { if (wrapper) wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 400);
   }
@@ -966,27 +1093,36 @@
     const contentEl = document.getElementById('content-' + name);
     const stored = resultStore[name][model];
     if (stored) {
-      contentEl.innerHTML = marked.parse(stored);
+      if (name === 'viral') { renderViralWithButtons(stored, contentEl); }
+      else { contentEl.innerHTML = marked.parse(stored); }
     } else {
       contentEl.innerHTML = '<span style="color:#bbb;font-size:13px">尚未生成此模式的结果，请切换模型后点击生成</span>';
     }
   }
 
   // ── 流式提交 ─────────────────────────────────────────────────────────────
-  async function submit(name, model) {
+  // submitProgrammatic: called without a click event (e.g. from bdSelectResult)
+  async function submitProgrammatic(name, model) {
+    await submit(name, model, null);
+  }
+
+  async function submit(name, model, clickedBtn) {
+    // Support both direct call (clickedBtn passed) and onclick call (read from event)
+    if (clickedBtn === undefined) clickedBtn = event.currentTarget;
+    const origText = clickedBtn ? clickedBtn.textContent : '';
+
     // 禁用该模块所有生成按钮，防止重复提交
     const allBtns = document.querySelectorAll(`#panel-${name} .btn-primary, #panel-${name} .btn-secondary`);
-    const clickedBtn = event.currentTarget;
-    const origText = clickedBtn.textContent;
     const resultCard = document.getElementById('result-' + name);
     const contentEl  = document.getElementById('content-' + name);
 
     allBtns.forEach(b => b.disabled = true);
-    clickedBtn.innerHTML = '<span class="spinner"></span>生成中...';
+    if (clickedBtn) clickedBtn.innerHTML = '<span class="spinner"></span>生成中...';
     contentEl.textContent = '';
     resultCard.classList.remove('show');
 
     try {
+      if (name === 'positioning') savePositioningHistory();
       const payload = { ...getPayload(name), model: model };
       const res = await fetch(API_MAP[name], {
         method: 'POST',
@@ -1018,15 +1154,21 @@
         fullText += decoder.decode(value, { stream: true });
         contentEl.innerHTML = marked.parse(fullText);
       }
-      // 存入 store
+      // 存入 store + 持久化
       resultStore[name][model] = fullText;
+      saveResultToStorage(name, model, fullText);
+      updateNavResultDot(name);
       // 定位分析完成 → 解锁 Step 2
       if (name === 'positioning') unlockStep2(fullText);
+      if (name === 'viral') renderViralWithButtons(fullText, contentEl);
     } catch (e) {
       alert('生成失败：' + e.message);
     } finally {
       allBtns.forEach(b => b.disabled = false);
-      clickedBtn.textContent = origText;
+      if (clickedBtn) clickedBtn.textContent = origText;
+      if (name === 'breakdown') {
+        document.getElementById('bd-analyzing-bar').style.display = 'none';
+      }
     }
   }
 
@@ -1053,6 +1195,7 @@
           followers: document.getElementById('cp-followers').value,
           daily_hours: document.getElementById('cp-hours').value,
           positioning_result: _positioningResult,
+          target_audience: document.getElementById('cp-target-audience').value.trim(),
           model,
         }),
       });
@@ -1129,10 +1272,11 @@
 
     // weekly
     document.getElementById('cp-weekly').innerHTML =
-      `<thead><tr><th>星期</th><th>内容类型</th><th>主题方向</th></tr></thead><tbody>` +
+      `<thead><tr><th>星期</th><th>内容类型</th><th>主题方向</th><th></th></tr></thead><tbody>` +
       (data.weekly_template || []).map(w => {
         const color = colorMap[w.type] || '#999';
-        return `<tr><td>${w.day}</td><td><span class="type-badge" style="background:${color}">${w.type}</span></td><td>${w.theme}</td></tr>`;
+        const safeTheme = (w.theme || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `<tr><td>${w.day}</td><td><span class="type-badge" style="background:${color}">${w.type}</span></td><td>${w.theme}</td><td><button class="btn-goto-script" onclick="goToScript('${safeTheme}')">✏️ 制作脚本</button></td></tr>`;
       }).join('') + '</tbody>';
 
     // growth
@@ -1146,6 +1290,13 @@
 
     const resultEl = document.getElementById('cp-result');
     resultEl.style.display = 'block';
+    // Mark Step 2 as done in stepper
+    const circle2 = document.getElementById('wf-circle-2');
+    const step2el  = document.getElementById('wf-step-2');
+    const sub2el   = document.getElementById('wf-sub-2');
+    if (circle2) circle2.textContent = '✓';
+    if (step2el)  step2el.className = 'wf-step done';
+    if (sub2el)   sub2el.textContent = '已完成';
     setTimeout(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   }
 
@@ -1172,7 +1323,14 @@
     event.currentTarget.classList.add('selected');
     const el = document.getElementById('cp-tooltip');
     el.className = 'cal-tooltip';
-    el.innerHTML = `<strong>第${day}天</strong> · <span style="color:${color};font-weight:600">${type}</span><br><span style="color:#666">${theme}</span>`;
+    const safeTheme = theme.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    el.innerHTML = `<strong>第${day}天</strong> · <span style="color:${color};font-weight:600">${type}</span><br><span style="color:#666">${theme}</span><br><button class="btn-goto-script" onclick="goToScript('${safeTheme.replace(/'/g, "\\'")}')">✏️ 制作脚本</button>`;
+  }
+
+  function goToScript(theme) {
+    document.getElementById('script-topic').value = theme;
+    const navEl = document.querySelector(".nav-item[onclick*=\"'script'\"]");
+    switchPanel('script', navEl);
   }
 
   function copyResult(name) {
@@ -1236,19 +1394,162 @@
     document.getElementById('bd-analyzing-title').textContent = title;
     bar.style.display = 'flex';
 
-    // Scroll to analysis area and trigger
+    // Scroll to analysis area and trigger (pass null for event — submit handles it)
     bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setTimeout(() => submit('breakdown', 'deepseek-chat'), 300);
+    setTimeout(() => submitProgrammatic('breakdown', 'deepseek-chat'), 300);
   }
 
-  async function fetchVideoUrl() {
-    const url = document.getElementById('bd-url').value.trim();
-    if (!url) { alert('请先输入视频链接'); return; }
+  function renderViralWithButtons(text, container) {
+    // Parse each topic block from raw LLM text
+    const topics = [];
+    // Split on numbered list items (1. / 2. etc), keep remainder
+    const parts = text.split(/\n(?=\d+\.\s)/);
+    parts.forEach(block => {
+      const tm = block.match(/【标题】([\s\S]*?)(?=【爆款理由】)/);
+      const rm = block.match(/【爆款理由】([\s\S]*?)$/);
+      if (tm) topics.push({ title: tm[1].trim(), reason: rm ? rm[1].trim() : '' });
+    });
+    if (topics.length === 0) {
+      // LLM didn't follow numbered format — fall back to marked, no buttons
+      container.innerHTML = marked.parse(text);
+      return;
+    }
+    container.innerHTML = topics.map((t, i) => {
+      const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const dataAttr = t.title.replace(/"/g, '&quot;');
+      return `<div class="viral-topic-card">
+        <div class="viral-topic-title">${i+1}. 【标题】${esc(t.title)}</div>
+        <div class="viral-topic-reason">【爆款理由】${esc(t.reason)}</div>
+        <button class="viral-script-btn" onclick="useTopicForScript(&quot;${dataAttr}&quot;)">📝 去制作脚本</button>
+      </div>`;
+    }).join('');
+  }
 
+  function useTopicForScript(title) {
+    const navEl = document.querySelector('.nav-item[onclick*="\'script\'"]');
+    switchPanel('script', navEl);
+    document.getElementById('script-topic').value = title;
+    setTimeout(() => document.getElementById('script-topic').scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  }
+
+  function toggleChipSingle(el, groupId) {
+    const group = document.getElementById(groupId);
+    const wasSelected = el.classList.contains('selected');
+    group.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+    if (!wasSelected) el.classList.add('selected');
+  }
+  function toggleChipMulti(el) {
+    el.classList.toggle('selected');
+  }
+
+  function toggleUrlGuide() {
+    const guide = document.getElementById('url-guide');
+    guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function fetchVideoUrl(model = 'deepseek-chat') {
+    const input = document.getElementById('bd-url').value.trim();
+    if (!input) { alert('请先输入视频链接或分享文案'); return; }
+
+    // Route: clean YouTube/Bilibili URL → legacy metadata fetch
+    const isYouTube  = /youtube\.com|youtu\.be/.test(input);
+    const isBilibili = /bilibili\.com|b23\.tv/.test(input);
+    if ((isYouTube || isBilibili) && !input.includes('\n') && !input.includes(' ')) {
+      return fetchVideoUrlLegacy(input);
+    }
+
+    // Everything else (Douyin, share text blobs, etc.) → DeepSeek direct
+    await fetchAndStreamSharetext(input, false, model);
+  }
+
+  let _bdPrompt = '';
+
+  function copyBdPrompt() {
+    if (!_bdPrompt) return;
+    navigator.clipboard.writeText(_bdPrompt).then(() => {
+      const btn = document.querySelector('#bd-prompt-preview button');
+      const orig = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(() => btn.textContent = orig, 1500);
+    });
+  }
+
+  async function fetchAndStreamSharetext(sharetext, isRetry, model = 'deepseek-chat') {
+    const btn         = document.getElementById('bd-fetch-btn');
+    const btnReasoner = document.getElementById('bd-fetch-btn-reasoner');
+    const resultBox   = document.getElementById('bd-fetch-result');
+    btn.disabled = true;
+    btnReasoner.disabled = true;
+    const isReasoner = model === 'deepseek-reasoner';
+    if (isReasoner) {
+      btnReasoner.innerHTML = isRetry ? '<span class="spinner"></span>重试中...' : '<span class="spinner"></span>思考中...';
+    } else {
+      btn.innerHTML = isRetry ? '<span class="spinner"></span>重试中...' : '<span class="spinner"></span>AI 分析中...';
+    }
+    if (!isRetry) {
+      resultBox.innerHTML = '';
+      // Show prompt preview
+      _bdPrompt = `请抓取这个视频的标题、话题、文案内容，并进行视频拆解分析：${sharetext}`;
+      document.getElementById('bd-prompt-text').textContent = _bdPrompt;
+      document.getElementById('bd-prompt-preview').style.display = 'block';
+    }
+
+    const bar = document.getElementById('bd-analyzing-bar');
+    document.getElementById('bd-analyzing-title').textContent = isRetry ? '重试中，请稍候...' : '正在分析视频内容...';
+    bar.style.display = 'flex';
+
+    const resultCard = document.getElementById('result-breakdown');
+    const contentEl  = document.getElementById('content-breakdown');
+    resultCard.classList.add('show');
+    contentEl.textContent = '';
+
+    try {
+      const res = await fetch('/api/breakdown-sharetext', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sharetext, model }),
+      });
+      if (!res.ok) throw new Error('请求失败');
+
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        contentEl.innerHTML = marked.parse(fullText);
+      }
+
+      // Auto-retry once if DeepSeek says it cannot fetch the video
+      const FAIL_PHRASES = ['无法根据', '无法抓取', '无法访问', '无法获取该视频', '链接无法', '无法直接访问'];
+      if (!isRetry && FAIL_PHRASES.some(p => fullText.includes(p))) {
+        contentEl.textContent = '';
+        await fetchAndStreamSharetext(sharetext, true, model);
+        return;
+      }
+
+      bar.style.display = 'none';
+      const storeKey = model === 'deepseek-reasoner' ? 'deepseek-reasoner' : 'deepseek-chat';
+      resultStore['breakdown'][storeKey] = fullText;
+    } catch (e) {
+      resultBox.innerHTML = `<div class="bd-error-box">请求失败：${escapeHtml(e.message)}</div>`;
+      bar.style.display = 'none';
+    } finally {
+      btn.disabled = false;
+      btnReasoner.disabled = false;
+      btn.innerHTML = '⚡ 解析';
+      btnReasoner.innerHTML = '🧠 深度思考';
+    }
+  }
+
+  async function fetchVideoUrlLegacy(url) {
     const btn = document.getElementById('bd-fetch-btn');
     const resultBox = document.getElementById('bd-fetch-result');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
+    document.getElementById('bd-prompt-preview').style.display = 'none';
+    _bdPrompt = '';
     resultBox.innerHTML = '';
 
     try {
@@ -1286,10 +1587,9 @@
         </div>`;
 
       if (item.title) {
-        const fetchCard = resultBox.querySelector('.bd-result-card');
-        fetchCard.onclick = () => bdSelectResult(item.title, item.url, item.snippet, fetchCard, item.transcript || '');
+        // Auto-start analysis immediately — no extra click needed
+        bdSelectResult(item.title, item.url, item.snippet, null, item.transcript || '');
       } else {
-        // Pre-fill URL into the content box for context
         document.getElementById('bd-content').value = `来源：${item.url}`;
         document.getElementById('bd-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
         document.getElementById('bd-title').focus();
@@ -1331,7 +1631,7 @@
       // 显示 B站 部分失败警告
       const warningEl = document.getElementById('bd-search-error');
       if (data.warning) {
-        warningEl.innerHTML = `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:8px 12px;font-size:13px;color:#c2410c;margin-bottom:8px;">⚠️ ${escapeHtml(data.warning)}，仅显示 YouTube 结果</div>`;
+        warningEl.innerHTML = `<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:8px 12px;font-size:13px;color:#c2410c;margin-bottom:8px;">⚠️ ${escapeHtml(data.warning)}</div>`;
       }
 
       const list = document.getElementById('bd-results-list');
@@ -1376,6 +1676,310 @@
       btn.textContent = origText;
     }
   }
+
+  // ── Input History ─────────────────────────────────────────────────────────
+  const POS_LAST_KEY  = 'pos_last_input';
+  const VIRAL_LAST_KEY = 'viral_last_input';
+  const POS_STR_KEY    = 'pos_strengths_history';
+  const POS_IND_KEY    = 'pos_industry_history';
+  const VIRAL_STR_KEY  = 'viral_strengths_history';
+  const VIRAL_IND_KEY  = 'viral_industry_history';
+  const MON_LAST_KEY   = 'mon_last_input';
+  const MON_STR_KEY    = 'mon_strengths_history';
+  const MON_IND_KEY    = 'mon_industry_history';
+  const HISTORY_MAX    = 5;
+
+  // ── Result persistence keys (viral / monetize / script) ──────────────────
+  const PERSIST_RESULT_KEYS = {
+    viral:    { 'deepseek-chat': 'res_viral_chat',    'deepseek-reasoner': 'res_viral_reasoner' },
+    monetize: { 'deepseek-chat': 'res_monetize_chat', 'deepseek-reasoner': 'res_monetize_reasoner' },
+    script:   { 'deepseek-chat': 'res_script_chat',   'deepseek-reasoner': 'res_script_reasoner' },
+  };
+
+  function saveResultToStorage(name, model, text) {
+    const keys = PERSIST_RESULT_KEYS[name];
+    if (!keys) return;
+    try { localStorage.setItem(keys[model], text); } catch(e) {}
+  }
+
+  function updateNavResultDot(name) {
+    const navEl = document.querySelector(`.nav-item[onclick*="'${name}'"]`);
+    if (navEl && !navEl.querySelector('.nav-result-dot')) {
+      const dot = document.createElement('span');
+      dot.className = 'nav-result-dot';
+      navEl.style.display = 'flex';
+      navEl.appendChild(dot);
+    }
+  }
+
+  function savePositioningHistory() {
+    const state = {
+      industry:        document.getElementById('pos-industry').value.trim(),
+      strengths:       document.getElementById('pos-strengths').value.trim(),
+      account_types:   getCheckedValues('pos-account-types'),
+      content_styles:  getCheckedValues('pos-content-styles'),
+      content_formats: getCheckedValues('pos-content-formats'),
+      resources:       getCheckedValues('pos-resources'),
+      platforms:       getCheckedValues('pos-platforms'),
+    };
+    if (!state.industry && !state.strengths) return;
+    localStorage.setItem(POS_LAST_KEY, JSON.stringify(state));
+    if (state.industry) {
+      let ih = JSON.parse(localStorage.getItem(POS_IND_KEY) || '[]');
+      ih = [state.industry, ...ih.filter(v => v !== state.industry)].slice(0, HISTORY_MAX);
+      localStorage.setItem(POS_IND_KEY, JSON.stringify(ih));
+      addToIndustryDatalist(ih);
+    }
+    if (state.strengths) {
+      let sh = JSON.parse(localStorage.getItem(POS_STR_KEY) || '[]');
+      sh = [state.strengths, ...sh.filter(v => v !== state.strengths)].slice(0, HISTORY_MAX);
+      localStorage.setItem(POS_STR_KEY, JSON.stringify(sh));
+      renderStrengthsChips(sh);
+    }
+    document.getElementById('pos-restore-bar').style.display = 'block';
+  }
+
+  function restoreLastInput() {
+    const raw = localStorage.getItem(POS_LAST_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    document.getElementById('pos-industry').value  = s.industry  || '';
+    document.getElementById('pos-strengths').value = s.strengths || '';
+    setCheckedValues('pos-account-types',   s.account_types   || []);
+    setCheckedValues('pos-content-styles',  s.content_styles  || []);
+    setCheckedValues('pos-content-formats', s.content_formats || []);
+    setCheckedValues('pos-resources',       s.resources       || []);
+    setCheckedValues('pos-platforms',       s.platforms       || []);
+  }
+
+  function saveViralHistory() {
+    const data = {
+      industry:  document.getElementById('viral-industry').value.trim(),
+      strengths: document.getElementById('viral-strengths').value.trim(),
+    };
+    if (!data.industry && !data.strengths) return;
+    localStorage.setItem(VIRAL_LAST_KEY, JSON.stringify(data));
+    if (data.industry) {
+      let ih = JSON.parse(localStorage.getItem(VIRAL_IND_KEY) || '[]');
+      ih = [data.industry, ...ih.filter(v => v !== data.industry)].slice(0, HISTORY_MAX);
+      localStorage.setItem(VIRAL_IND_KEY, JSON.stringify(ih));
+      addToViralIndustryDatalist(ih);
+    }
+    if (data.strengths) {
+      let sh = JSON.parse(localStorage.getItem(VIRAL_STR_KEY) || '[]');
+      sh = [data.strengths, ...sh.filter(v => v !== data.strengths)].slice(0, HISTORY_MAX);
+      localStorage.setItem(VIRAL_STR_KEY, JSON.stringify(sh));
+      renderViralStrengthsChips(sh);
+    }
+    document.getElementById('viral-restore-bar').style.display = 'block';
+  }
+
+  function restoreViralLastInput() {
+    const raw = localStorage.getItem(VIRAL_LAST_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    document.getElementById('viral-industry').value  = s.industry  || '';
+    document.getElementById('viral-strengths').value = s.strengths || '';
+  }
+
+  function addToViralIndustryDatalist(industries) {
+    const dl = document.getElementById('viral-industry-list');
+    if (!dl) return;
+    const existing = new Set([...dl.options].map(o => o.value));
+    industries.forEach(v => {
+      if (!existing.has(v)) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        dl.appendChild(opt);
+      }
+    });
+  }
+
+  function renderViralStrengthsChips(history) {
+    const container = document.getElementById('viral-strengths-chips');
+    if (!container) return;
+    if (!history.length) { container.style.display = 'none'; return; }
+    container.style.display = 'flex';
+    container.innerHTML = history.slice(0, 3).map((text, i) => {
+      const label = text.length > 22 ? text.slice(0, 22) + '\u2026' : text;
+      return `<span class="history-chip" title="${text.replace(/"/g, '&quot;')}" onclick="fillViralStrengths(${i})">${label}<span class="chip-del" onclick="deleteViralStrengthChip(event,${i})">×</span></span>`;
+    }).join('');
+  }
+
+  function fillViralStrengths(idx) {
+    const sh = JSON.parse(localStorage.getItem(VIRAL_STR_KEY) || '[]');
+    if (sh[idx] !== undefined) document.getElementById('viral-strengths').value = sh[idx];
+  }
+
+  function deleteViralStrengthChip(e, idx) {
+    e.stopPropagation();
+    let sh = JSON.parse(localStorage.getItem(VIRAL_STR_KEY) || '[]');
+    sh.splice(idx, 1);
+    localStorage.setItem(VIRAL_STR_KEY, JSON.stringify(sh));
+    renderViralStrengthsChips(sh);
+  }
+
+  // ── 变现选题 history ──────────────────────────────────────────────────────
+  function saveMonHistory() {
+    const data = {
+      industry:  document.getElementById('mon-industry').value.trim(),
+      strengths: document.getElementById('mon-strengths').value.trim(),
+    };
+    if (!data.industry && !data.strengths) return;
+    localStorage.setItem(MON_LAST_KEY, JSON.stringify(data));
+    if (data.industry) {
+      let ih = JSON.parse(localStorage.getItem(MON_IND_KEY) || '[]');
+      ih = [data.industry, ...ih.filter(v => v !== data.industry)].slice(0, HISTORY_MAX);
+      localStorage.setItem(MON_IND_KEY, JSON.stringify(ih));
+      addToMonIndustryDatalist(ih);
+    }
+    if (data.strengths) {
+      let sh = JSON.parse(localStorage.getItem(MON_STR_KEY) || '[]');
+      sh = [data.strengths, ...sh.filter(v => v !== data.strengths)].slice(0, HISTORY_MAX);
+      localStorage.setItem(MON_STR_KEY, JSON.stringify(sh));
+      renderMonStrengthsChips(sh);
+    }
+    document.getElementById('mon-restore-bar').style.display = 'block';
+  }
+
+  function restoreMonLastInput() {
+    const raw = localStorage.getItem(MON_LAST_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    document.getElementById('mon-industry').value  = s.industry  || '';
+    document.getElementById('mon-strengths').value = s.strengths || '';
+  }
+
+  function addToMonIndustryDatalist(industries) {
+    const dl = document.getElementById('mon-industry-list');
+    if (!dl) return;
+    const existing = new Set([...dl.options].map(o => o.value));
+    industries.forEach(v => {
+      if (!existing.has(v)) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        dl.appendChild(opt);
+      }
+    });
+  }
+
+  function renderMonStrengthsChips(history) {
+    const container = document.getElementById('mon-strengths-chips');
+    if (!container) return;
+    if (!history.length) { container.style.display = 'none'; return; }
+    container.style.display = 'flex';
+    container.innerHTML = history.slice(0, 3).map((text, i) => {
+      const label = text.length > 22 ? text.slice(0, 22) + '\u2026' : text;
+      return `<span class="history-chip" title="${text.replace(/"/g, '&quot;')}" onclick="fillMonStrengths(${i})">${label}<span class="chip-del" onclick="deleteMonStrengthChip(event,${i})">×</span></span>`;
+    }).join('');
+  }
+
+  function fillMonStrengths(idx) {
+    const sh = JSON.parse(localStorage.getItem(MON_STR_KEY) || '[]');
+    if (sh[idx] !== undefined) document.getElementById('mon-strengths').value = sh[idx];
+  }
+
+  function deleteMonStrengthChip(e, idx) {
+    e.stopPropagation();
+    let sh = JSON.parse(localStorage.getItem(MON_STR_KEY) || '[]');
+    sh.splice(idx, 1);
+    localStorage.setItem(MON_STR_KEY, JSON.stringify(sh));
+    renderMonStrengthsChips(sh);
+  }
+
+  function setCheckedValues(groupId, values) {
+    document.querySelectorAll(`#${groupId} input[type=checkbox]`).forEach(cb => {
+      cb.checked = values.includes(cb.value);
+      cb.closest('.checkbox-label').classList.toggle('checked', cb.checked);
+    });
+  }
+
+  function addToIndustryDatalist(industries) {
+    const dl = document.getElementById('industry-list');
+    if (!dl) return;
+    const existing = new Set([...dl.options].map(o => o.value));
+    industries.forEach(v => {
+      if (!existing.has(v)) {
+        const opt = document.createElement('option');
+        opt.value = v;
+        dl.appendChild(opt);
+      }
+    });
+  }
+
+  function renderStrengthsChips(history) {
+    const container = document.getElementById('pos-strengths-chips');
+    if (!container) return;
+    if (!history.length) { container.style.display = 'none'; return; }
+    container.style.display = 'flex';
+    container.innerHTML = history.slice(0, 3).map((text, i) => {
+      const label = text.length > 22 ? text.slice(0, 22) + '\u2026' : text;
+      return `<span class="history-chip" title="${text.replace(/"/g, '&quot;')}" onclick="fillStrengths(${i})">${label}<span class="chip-del" onclick="deleteStrengthChip(event,${i})">×</span></span>`;
+    }).join('');
+  }
+
+  function fillStrengths(idx) {
+    const sh = JSON.parse(localStorage.getItem(POS_STR_KEY) || '[]');
+    if (sh[idx] !== undefined) document.getElementById('pos-strengths').value = sh[idx];
+  }
+
+  function deleteStrengthChip(e, idx) {
+    e.stopPropagation();
+    let sh = JSON.parse(localStorage.getItem(POS_STR_KEY) || '[]');
+    sh.splice(idx, 1);
+    localStorage.setItem(POS_STR_KEY, JSON.stringify(sh));
+    renderStrengthsChips(sh);
+  }
+
+  (function initPositioningHistory() {
+    const ih = JSON.parse(localStorage.getItem(POS_IND_KEY) || '[]');
+    addToIndustryDatalist(ih);
+    const sh = JSON.parse(localStorage.getItem(POS_STR_KEY) || '[]');
+    renderStrengthsChips(sh);
+    if (localStorage.getItem(POS_LAST_KEY)) {
+      document.getElementById('pos-restore-bar').style.display = 'block';
+    }
+    if (localStorage.getItem(VIRAL_LAST_KEY)) {
+      document.getElementById('viral-restore-bar').style.display = 'block';
+    }
+    const vih = JSON.parse(localStorage.getItem(VIRAL_IND_KEY) || '[]');
+    addToViralIndustryDatalist(vih);
+    const vsh = JSON.parse(localStorage.getItem(VIRAL_STR_KEY) || '[]');
+    renderViralStrengthsChips(vsh);
+    if (localStorage.getItem(MON_LAST_KEY)) {
+      document.getElementById('mon-restore-bar').style.display = 'block';
+    }
+    const mih = JSON.parse(localStorage.getItem(MON_IND_KEY) || '[]');
+    addToMonIndustryDatalist(mih);
+    const msh = JSON.parse(localStorage.getItem(MON_STR_KEY) || '[]');
+    renderMonStrengthsChips(msh);
+    // Restore persisted results
+    Object.entries(PERSIST_RESULT_KEYS).forEach(([panelName, modelKeys]) => {
+      let activeModel = null;
+      Object.entries(modelKeys).forEach(([model, storageKey]) => {
+        const text = localStorage.getItem(storageKey);
+        if (!text) return;
+        resultStore[panelName][model] = text;
+        const tabSuffix = model === 'deepseek-chat' ? 'chat' : 'reasoner';
+        const tab = document.getElementById(`tab-${panelName}-${tabSuffix}`);
+        if (tab) tab.classList.add('has-result');
+        if (!activeModel) activeModel = model; // prefer chat (iterated first)
+      });
+      if (!activeModel) return;
+      const contentEl  = document.getElementById(`content-${panelName}`);
+      const resultCard = document.getElementById(`result-${panelName}`);
+      if (!contentEl || !resultCard) return;
+      const text = resultStore[panelName][activeModel];
+      if (panelName === 'viral') renderViralWithButtons(text, contentEl);
+      else contentEl.innerHTML = marked.parse(text);
+      resultCard.classList.add('show');
+      document.querySelectorAll(`#result-${panelName} .result-tab`).forEach(t => t.classList.remove('active'));
+      const tabSuffix = activeModel === 'deepseek-chat' ? 'chat' : 'reasoner';
+      const activeTab = document.getElementById(`tab-${panelName}-${tabSuffix}`);
+      if (activeTab) activeTab.classList.add('active');
+      updateNavResultDot(panelName);
+    });
+  })();
 </script>
 </body>
 </html>

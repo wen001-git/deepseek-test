@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import tempfile
 import requests
 from dotenv import load_dotenv
 try:
@@ -8,6 +9,20 @@ try:
     _YT_TRANSCRIPT_AVAILABLE = True
 except ImportError:
     _YT_TRANSCRIPT_AVAILABLE = False
+
+try:
+    from faster_whisper import WhisperModel
+    _WHISPER_AVAILABLE = True
+except ImportError:
+    _WHISPER_AVAILABLE = False
+
+_whisper_model = None  # lazy-loaded on first use
+
+def _get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        _whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+    return _whisper_model
 
 load_dotenv()
 
@@ -82,6 +97,326 @@ def _extract_bvid(url: str):
 def _extract_youtube_id(url: str):
     m = re.search(r"(?:v=|youtu\.be/|shorts/)([A-Za-z0-9_-]{11})", url)
     return m.group(1) if m else None
+
+
+JINA_MAX_CHARS = 3000
+
+try:
+    import yt_dlp
+    _YTDLP_AVAILABLE = True
+except ImportError:
+    _YTDLP_AVAILABLE = False
+
+try:
+    from ddgs import DDGS
+    _DDGS_AVAILABLE = True
+except ImportError:
+    _DDGS_AVAILABLE = False
+
+
+def fetch_via_ytdlp(url: str) -> 'str | None':
+    """Extract video metadata via yt-dlp. Works for Douyin, YouTube, etc."""
+    if not _YTDLP_AVAILABLE:
+        return None
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'skip_download': True,
+            'extract_flat': False,
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                return None
+            title = info.get('title') or ''
+            desc  = info.get('description') or ''
+            tags  = info.get('tags') or []
+            uploader = info.get('uploader') or ''
+            view_count = info.get('view_count')
+            like_count = info.get('like_count')
+
+            parts = []
+            if title:
+                parts.append(f"标题：{title}")
+            if tags:
+                parts.append(f"话题标签：{'  '.join('#' + t for t in tags[:10])}")
+            if desc and desc != title:
+                parts.append(f"文案内容：{desc[:1500]}")
+            if uploader:
+                parts.append(f"发布者：{uploader}")
+            stats = []
+            if view_count:
+                stats.append(f"播放 {_fmt_play(view_count)}")
+            if like_count:
+                stats.append(f"点赞 {_fmt_play(like_count)}")
+            if stats:
+                parts.append(f"视频数据：{'  |  '.join(stats)}")
+            return '\n'.join(parts) if parts else None
+    except Exception as e:
+        print(f"[fetch_via_ytdlp] error: {e}")
+        return None
+
+
+def fetch_via_jina(url: str) -> 'str | None':
+    """Fetch page content via Jina AI Reader (r.jina.ai). Returns text or None on failure."""
+    try:
+        resp = requests.get(
+            f"https://r.jina.ai/{url}",
+            headers={"Accept": "text/plain", "X-No-Cache": "true"},
+            timeout=10,
+        )
+        if resp.status_code == 200 and resp.text.strip():
+            return resp.text[:JINA_MAX_CHARS]
+    except Exception:
+        pass
+    return None
+
+
+def fetch_via_whisper(url: str) -> 'str | None':
+    """Download audio via yt-dlp and transcribe with Whisper. Returns transcript or None."""
+    if not _YTDLP_AVAILABLE or not _WHISPER_AVAILABLE:
+        return None
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            audio_path = os.path.join(tmpdir, 'audio.%(ext)s')
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'format': 'bestaudio/best',
+                'outtmpl': audio_path,
+                'postprocessors': [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '64',
+                }],
+                'socket_timeout': 15,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+
+            mp3_path = os.path.join(tmpdir, 'audio.mp3')
+            if not os.path.exists(mp3_path):
+                return None
+
+            model = _get_whisper_model()
+            segments, _ = model.transcribe(mp3_path, language='zh', beam_size=1)
+            transcript = ' '.join(seg.text.strip() for seg in segments)
+            return transcript[:3000] if transcript.strip() else None
+    except Exception as e:
+        print(f"[fetch_via_whisper] error: {e}")
+        return None
+
+
+DOUYIN_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                  "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Referer": "https://www.douyin.com/",
+}
+
+
+def _resolve_douyin_url(url: str) -> 'str | None':
+    """Follow redirects from a Douyin short URL to get the canonical video URL."""
+    try:
+        resp = requests.head(url, headers=DOUYIN_HEADERS, allow_redirects=True, timeout=8)
+        return resp.url
+    except Exception:
+        return None
+
+
+def fetch_douyin_info(url: str) -> 'str | None':
+    """Fetch Douyin video info by scraping iesdouyin share page. Returns formatted text or None."""
+    # Resolve short URL → iesdouyin share URL containing the video ID
+    canonical = _resolve_douyin_url(url) if 'v.douyin.com' in url else url
+    if not canonical:
+        return None
+    m = re.search(r'/video/(\d+)', canonical) or re.search(r'(\d{15,})', canonical)
+    if not m:
+        return None
+    video_id = m.group(1)
+
+    try:
+        resp = requests.get(
+            f'https://www.iesdouyin.com/share/video/{video_id}/',
+            headers=DOUYIN_HEADERS,
+            timeout=10,
+        )
+        html = resp.text
+
+        def _scrape(pattern):
+            hit = re.search(pattern, html)
+            return hit.group(1) if hit else ''
+
+        desc     = _scrape(r'"desc":"(.*?)"(?:,|\})')
+        author   = _scrape(r'"nickname":"(.*?)"')
+        likes    = _scrape(r'"digg_count":(\d+)')
+        comments = _scrape(r'"comment_count":(\d+)')
+        shares   = _scrape(r'"share_count":(\d+)')
+        collects = _scrape(r'"collect_count":(\d+)')
+
+        if not desc and not author:
+            return None
+
+        parts = []
+        if desc:
+            parts.append(f"视频文案：{desc}")
+        if author:
+            parts.append(f"发布者：{author}")
+        stat_parts = []
+        if likes:    stat_parts.append(f"点赞 {_fmt_play(likes)}")
+        if comments: stat_parts.append(f"评论 {_fmt_play(comments)}")
+        if collects: stat_parts.append(f"收藏 {_fmt_play(collects)}")
+        if shares:   stat_parts.append(f"分享 {_fmt_play(shares)}")
+        if stat_parts:
+            parts.append(f"视频数据：{'  |  '.join(stat_parts)}")
+
+        print(f"[fetch_douyin_info] got info for video {video_id}")
+        return '\n'.join(parts)
+    except Exception as e:
+        print(f"[fetch_douyin_info] error: {e}")
+    return None
+
+
+def _extract_search_query(sharetext: str) -> str:
+    """Extract a clean search query from Douyin share text."""
+    text = sharetext
+    # Remove URL
+    text = re.sub(r'https?://\S+', '', text)
+    # Remove trailing copy-prompt instruction
+    text = re.sub(r'复制此链接.*$', '', text, flags=re.DOTALL)
+    # Strip leading ASCII noise (share codes like "9.92 11/17 a@N.WZ uSY:/")
+    # by keeping only from the first CJK character onward
+    m = re.search(r'[\u4e00-\u9fff]', text)
+    text = text[m.start():] if m else text
+    return text.strip()
+
+
+_ARTICLE_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+                  "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    "Accept-Language": "zh-CN,zh;q=0.9",
+}
+# Domains known to return readable article text
+_ARTICLE_DOMAINS = (
+    'sohu.com', 'sina.com', 'sina.cn', 'cj.sina', '36kr.com',
+    'zhihu.com', 'baidu.com', 'toutiao.com', 'ifeng.com',
+    'thepaper.cn', 'weixin.qq.com', 'qq.com', 'guancha.cn',
+    'wenxuecity.com', 'zaobao.com',
+)
+
+
+def _fetch_article_text(url: str, keywords: list = None, max_chars: int = 1500) -> 'str | None':
+    """Fetch article text from whitelisted domains, extract paragraphs containing keywords."""
+    if not any(d in url for d in _ARTICLE_DOMAINS):
+        return None
+    try:
+        resp = requests.get(url, headers=_ARTICLE_HEADERS, timeout=8, allow_redirects=True)
+        if resp.status_code != 200:
+            return None
+        # Strip scripts/styles/tags
+        html = re.sub(r'<(?:script|style)[^>]*>.*?</(?:script|style)>', '', resp.text,
+                      flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r'<[^>]+>', ' ', html)
+        text = re.sub(r'[ \t]+', ' ', text)
+        # Split into non-empty lines and find the richest paragraphs
+        lines = [l.strip() for l in text.splitlines() if len(l.strip()) > 30]
+        if not lines:
+            return None
+        # Prefer lines that contain any keyword
+        if keywords:
+            scored = [(sum(k in l for k in keywords), l) for l in lines]
+            scored.sort(key=lambda x: -x[0])
+            best = [l for _, l in scored if _ > 0][:8]
+            if not best:
+                best = lines[:6]
+        else:
+            best = lines[:8]
+        result = ' '.join(best)
+        return result[:max_chars] if len(result) > 50 else None
+    except Exception:
+        return None
+
+
+def fetch_via_search(sharetext: str) -> 'str | None':
+    """Search DuckDuckGo with two queries, fetch full article text from top results."""
+    if not _DDGS_AVAILABLE:
+        return None
+    query = _extract_search_query(sharetext)
+    if not query:
+        return None
+
+    # Extract short title (first clause before hashtags)
+    short_title = re.split(r'#|\s{2,}', query)[0].strip()
+    article_query = short_title + ' 视频 文案 解说'
+
+    all_results = []
+    try:
+        with DDGS() as ddgs:
+            r1 = list(ddgs.text(query, max_results=4, region='cn-zh'))
+            r2 = list(ddgs.text(article_query, max_results=4, region='cn-zh'))
+            # Deduplicate by URL
+            seen = set()
+            for r in r1 + r2:
+                u = r.get('href', '')
+                if u and u not in seen:
+                    seen.add(u)
+                    all_results.append(r)
+    except Exception as e:
+        print(f"[fetch_via_search] DDG error: {e}")
+        return None
+
+    keywords = [w for w in short_title.split() if len(w) > 1][:6]
+    parts = []
+    for r in all_results[:6]:
+        title = r.get('title', '')
+        url   = r.get('href', '')
+        body  = r.get('body', '')
+        full = _fetch_article_text(url, keywords=keywords) if url else None
+        if full:
+            parts.append(f"[{title}]\n{full}")
+        elif body:
+            parts.append(f"[{title}]\n{body}")
+        if len(parts) >= 4:
+            break
+
+    if not parts:
+        return None
+    print(f"[fetch_via_search] {len(parts)} results for: {query[:60]}")
+    return '\n\n'.join(parts)[:4000]
+
+
+def fetch_video_content(url: str, sharetext: str = '') -> 'str | None':
+    """Try Douyin API, yt-dlp metadata, Whisper, search engine, then Jina as fallback."""
+    # 0. Douyin-specific: try unofficial API for real video metadata
+    if 'douyin.com' in url or 'iesdouyin.com' in url:
+        douyin_info = fetch_douyin_info(url)
+        if douyin_info:
+            # Also append search snippets for extra context
+            search_extra = fetch_via_search(sharetext) if sharetext else None
+            if search_extra:
+                return douyin_info + '\n\n【网络相关资讯】\n' + search_extra[:1000]
+            return douyin_info
+
+    # 1. Try yt-dlp metadata (title, description, hashtags)
+    metadata = fetch_via_ytdlp(url)
+
+    # 2. Try Whisper transcription for actual spoken content
+    transcript = fetch_via_whisper(url)
+
+    if not metadata and not transcript:
+        # 3. Try search engine — find web coverage of this video
+        if sharetext:
+            search_result = fetch_via_search(sharetext)
+            if search_result:
+                return search_result
+        return fetch_via_jina(url)
+
+    parts = []
+    if metadata:
+        parts.append(metadata)
+    if transcript:
+        parts.append(f"\n视频语音文案（Whisper转录）：\n{transcript}")
+    return '\n'.join(parts) if parts else None
 
 
 # ── B站关键词搜索 ─────────────────────────────────────────────────────────────
@@ -190,6 +525,91 @@ def search_youtube(topic: str) -> tuple:
     return results, None
 
 
+# ── 微信视频号搜索（搜狗） ────────────────────────────────────────────────────
+
+SOGOU_WEIXIN_URL = 'https://weixin.sogou.com/weixin'
+SOGOU_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-CN,zh;q=0.9',
+    'Referer': 'https://weixin.sogou.com/',
+}
+
+
+def search_weixin_video(topic: str) -> tuple:
+    """Search WeChat 视频号 content.
+    Strategy 1: Sogou WeChat search (weixin.sogou.com)
+    Strategy 2: DuckDuckGo site:mp.weixin.qq.com fallback
+    Returns (list[{title,url,snippet,platform,source}], error_str|None)"""
+
+    # ── Strategy 1: Sogou WeChat search ──────────────────────────────────────
+    try:
+        from lxml import html as lxml_html
+        resp = requests.get(
+            SOGOU_WEIXIN_URL,
+            params={'query': topic, 'type': '2', 'ie': 'utf8'},
+            headers=SOGOU_HEADERS,
+            timeout=10,
+        )
+        if resp.status_code == 200 and 'antispider' not in resp.url:
+            # Sogou often returns GBK — detect and re-encode to utf-8 for lxml
+            resp.encoding = resp.apparent_encoding or 'utf-8'
+            tree = lxml_html.fromstring(resp.text.encode('utf-8'))
+
+            # Try multiple XPath patterns in decreasing specificity
+            items = (tree.xpath('//ul[contains(@class,"news-box")]/li') or
+                     tree.xpath('//li[contains(@class,"news-item")]') or
+                     tree.xpath('//div[contains(@class,"news-item")]'))
+
+            results = []
+            for item in items[:5]:
+                a_els = item.xpath('.//h3//a | .//h4//a')
+                if not a_els:
+                    continue
+                title = _strip_html(a_els[0].text_content()).strip()
+                href  = a_els[0].get('href', '')
+                if not title or not href:
+                    continue
+                if href.startswith('/'):
+                    href = 'https://weixin.sogou.com' + href
+
+                snippets = item.xpath('.//*[contains(@class,"txt")]//text()')
+                snippet  = re.sub(r'\s+', ' ', ' '.join(snippets)).strip()[:120]
+                account_els = item.xpath('.//*[contains(@class,"account")]//text() | '
+                                         './/*[contains(@class,"nickname")]//text()')
+                account = account_els[0].strip() if account_els else ''
+                display = f"{account}：{snippet}" if account and snippet else (account or snippet)
+
+                results.append({'title': title, 'url': href, 'snippet': display,
+                                 'platform': '视频号', 'source': 'real'})
+            if results:
+                return results, None
+    except Exception:
+        pass
+
+    # ── Strategy 2: DuckDuckGo fallback (site:mp.weixin.qq.com) ──────────────
+    try:
+        from ddgs import DDGS
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(f'{topic} site:mp.weixin.qq.com', max_results=6):
+                title = r.get('title', '').strip()
+                href  = r.get('href', '')
+                if not title or not href:
+                    continue
+                results.append({'title': title, 'url': href,
+                                 'snippet': r.get('body', '')[:120],
+                                 'platform': '视频号', 'source': 'real'})
+                if len(results) >= 5:
+                    break
+        if results:
+            return results, None
+    except Exception:
+        pass
+
+    return [], "未找到相关视频号内容，请换个关键词"
+
+
 # ── URL 解析 ──────────────────────────────────────────────────────────────────
 
 def fetch_video_from_url(url: str) -> tuple:
@@ -203,7 +623,7 @@ def fetch_video_from_url(url: str) -> tuple:
         if bvid:
             try:
                 resp = requests.get(BILIBILI_VIEW_URL, params={"bvid": bvid},
-                                    headers=BILIBILI_HEADERS, timeout=8)
+                                    headers=BILIBILI_HEADERS, timeout=4)
                 resp.raise_for_status()
                 data = resp.json()
                 if data.get("code") == 0:
