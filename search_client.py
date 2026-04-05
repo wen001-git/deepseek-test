@@ -538,8 +538,8 @@ SOGOU_HEADERS = {
 
 def search_weixin_video(topic: str) -> tuple:
     """Search WeChat 视频号 content.
-    Strategy 1: Sogou WeChat search (weixin.sogou.com)
-    Strategy 2: DuckDuckGo site:mp.weixin.qq.com fallback
+    Strategy 1: Sogou WeChat search with robust GBK decoding + broad XPath
+    Strategy 2: DuckDuckGo '{topic} 视频号' filtered for WeChat-related results
     Returns (list[{title,url,snippet,platform,source}], error_str|None)"""
 
     # ── Strategy 1: Sogou WeChat search ──────────────────────────────────────
@@ -552,53 +552,83 @@ def search_weixin_video(topic: str) -> tuple:
             timeout=10,
         )
         if resp.status_code == 200 and 'antispider' not in resp.url:
-            # Sogou often returns GBK — detect and re-encode to utf-8 for lxml
-            resp.encoding = resp.apparent_encoding or 'utf-8'
-            tree = lxml_html.fromstring(resp.text.encode('utf-8'))
+            # Sogou is GBK/GB2312 — decode explicitly
+            text = None
+            for enc in ('gb2312', 'gbk', 'utf-8'):
+                try:
+                    text = resp.content.decode(enc)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if text is None:
+                text = resp.content.decode('utf-8', errors='replace')
 
-            # Try multiple XPath patterns in decreasing specificity
+            tree = lxml_html.fromstring(text)
+
+            results = []
+            # Try class-based selectors first
             items = (tree.xpath('//ul[contains(@class,"news-box")]/li') or
                      tree.xpath('//li[contains(@class,"news-item")]') or
                      tree.xpath('//div[contains(@class,"news-item")]'))
 
-            results = []
-            for item in items[:5]:
-                a_els = item.xpath('.//h3//a | .//h4//a')
-                if not a_els:
-                    continue
-                title = _strip_html(a_els[0].text_content()).strip()
-                href  = a_els[0].get('href', '')
-                if not title or not href:
-                    continue
-                if href.startswith('/'):
-                    href = 'https://weixin.sogou.com' + href
+            if items:
+                for item in items[:5]:
+                    a_els = item.xpath('.//h3//a | .//h4//a')
+                    if not a_els:
+                        continue
+                    title = _strip_html(a_els[0].text_content()).strip()
+                    href  = a_els[0].get('href', '')
+                    if not title or not href:
+                        continue
+                    if href.startswith('/'):
+                        href = 'https://weixin.sogou.com' + href
+                    snippets = item.xpath('.//*[contains(@class,"txt")]//text()')
+                    snippet  = re.sub(r'\s+', ' ', ' '.join(snippets)).strip()[:120]
+                    account_els = item.xpath('.//*[contains(@class,"account")]//text()')
+                    account = account_els[0].strip() if account_els else ''
+                    display = f"{account}：{snippet}" if account and snippet else (account or snippet)
+                    results.append({'title': title, 'url': href, 'snippet': display,
+                                     'platform': '视频号', 'source': 'real'})
+            else:
+                # Broad fallback: all h3 > a links on the page
+                for a in tree.xpath('//h3//a[@href]')[:5]:
+                    title = _strip_html(a.text_content()).strip()
+                    href  = a.get('href', '')
+                    if not title or not href:
+                        continue
+                    if href.startswith('/'):
+                        href = 'https://weixin.sogou.com' + href
+                    results.append({'title': title, 'url': href, 'snippet': '',
+                                     'platform': '视频号', 'source': 'real'})
 
-                snippets = item.xpath('.//*[contains(@class,"txt")]//text()')
-                snippet  = re.sub(r'\s+', ' ', ' '.join(snippets)).strip()[:120]
-                account_els = item.xpath('.//*[contains(@class,"account")]//text() | '
-                                         './/*[contains(@class,"nickname")]//text()')
-                account = account_els[0].strip() if account_els else ''
-                display = f"{account}：{snippet}" if account and snippet else (account or snippet)
-
-                results.append({'title': title, 'url': href, 'snippet': display,
-                                 'platform': '视频号', 'source': 'real'})
             if results:
                 return results, None
     except Exception:
         pass
 
-    # ── Strategy 2: DuckDuckGo fallback (site:mp.weixin.qq.com) ──────────────
+    # ── Strategy 2: DuckDuckGo — broad query filtered for WeChat relevance ────
+    # Note: site:mp.weixin.qq.com returns URLs-as-titles because WeChat hides
+    # meta-data from crawlers. Instead search broadly and filter by content.
     try:
         from ddgs import DDGS
         results = []
         with DDGS() as ddgs:
-            for r in ddgs.text(f'{topic} site:mp.weixin.qq.com', max_results=6):
-                title = r.get('title', '').strip()
+            for r in ddgs.text(f'{topic} 视频号', max_results=12):
                 href  = r.get('href', '')
+                title = r.get('title', '').strip()
+                body  = r.get('body', '')
                 if not title or not href:
                     continue
+                # Skip results that look like bare URLs (WeChat hiding meta)
+                if title.startswith('http') or title.startswith('mp.weixin'):
+                    continue
+                # Keep only results mentioning WeChat/视频号 in URL or text
+                is_weixin_url = 'weixin.qq.com' in href or 'weixin.sogou.com' in href
+                mentions_wx   = '视频号' in (title + body) or '微信' in (title + body)
+                if not is_weixin_url and not mentions_wx:
+                    continue
                 results.append({'title': title, 'url': href,
-                                 'snippet': r.get('body', '')[:120],
+                                 'snippet': body[:120],
                                  'platform': '视频号', 'source': 'real'})
                 if len(results) >= 5:
                     break
