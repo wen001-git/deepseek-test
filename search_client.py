@@ -65,9 +65,11 @@ def _fmt_play(n) -> str:
     except (TypeError, ValueError):
         return "—"
     if n >= 100_000_000:
-        return f"{n / 100_000_000:.1f}亿"
+        approx = f"{n / 100_000_000:.2f}亿"
+        return f"{n:,}（{approx}）"
     if n >= 10_000:
-        return f"{n // 10_000}万"
+        approx = f"{n / 10_000:.2f}万"
+        return f"{n:,}（{approx}）"
     return str(n)
 
 

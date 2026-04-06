@@ -42,7 +42,12 @@ def ping():
 
 
 def stream_response(system_prompt, user_prompt, model):
+    is_admin = session.get('role') == 'admin'
     def generate():
+        if is_admin:
+            import json as _json
+            marker = _json.dumps({"sys": system_prompt, "usr": user_prompt}, ensure_ascii=False)
+            yield f"[DEBUG:{marker}:DEBUG]\n"
         try:
             yield from generate_stream(system_prompt, user_prompt, model or None)
         except Exception as e:
@@ -54,6 +59,7 @@ def stream_response(system_prompt, user_prompt, model):
 def index():
     return render_template(
         "index.html",
+        is_admin=session.get('role') == 'admin',
         video_types=VIDEO_TYPES,
         styles=STYLES,
         industries=INDUSTRIES,

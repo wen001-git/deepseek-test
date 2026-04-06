@@ -157,6 +157,17 @@
     }
     .btn-copy:active { background: #e5e7eb; }
 
+    /* Admin prompt debug box */
+    .prompt-debug { margin-bottom: 16px; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; font-size: 12px; }
+    .prompt-debug-header { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #1a1a2e; color: #a5b4fc; cursor: pointer; user-select: none; -webkit-user-select: none; font-weight: 600; }
+    .prompt-debug-header span.badge { background: #6366f1; color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; }
+    .prompt-debug-body { display: none; background: #0f0f23; color: #e2e8f0; }
+    .prompt-debug-body.open { display: block; }
+    .prompt-debug-section { padding: 10px 14px; border-top: 1px solid #2d2d4e; }
+    .prompt-debug-section:first-child { border-top: none; }
+    .prompt-debug-label { color: #6366f1; font-weight: 700; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .prompt-debug-text { white-space: pre-wrap; font-family: "SF Mono", "Fira Code", monospace; line-height: 1.6; color: #cbd5e1; font-size: 12px; }
+
     /* 结果区 */
     .result-card { background: #fff; border-radius: 14px; padding: 0; box-shadow: 0 1px 6px rgba(0,0,0,0.07); display: none; overflow: hidden; }
     .result-card.show { display: block; }
@@ -312,7 +323,7 @@
       <div class="nav-group-title">进阶工具</div>
       <div class="nav-item" onclick="switchPanel('breakdown', this)"><span class="icon">🔍</span> 爆款拆解</div>
       <div class="nav-item" onclick="switchPanel('imitate', this)"><span class="icon">✍️</span> 爆款仿写</div>
-      <div class="nav-item" onclick="switchPanel('director', this)"><span class="icon">🎬</span> 编导专栏</div>
+      {% if is_admin %}<div class="nav-item" onclick="switchPanel('director', this)"><span class="icon">🎬</span> 编导专栏</div>{% endif %}
     </div>
     <div style="margin-top:auto; padding: 16px 20px; border-top: 1px solid #2d2d4e;">
       <div style="font-size:12px; color:#666; margin-bottom:10px;">{{ session.get('username', '') }}</div>
@@ -417,6 +428,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-positioning-reasoner" onclick="switchResultTab('positioning','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-positioning" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-positioning"></div>
           <button class="btn-copy" onclick="copyResult('positioning')">复制结果</button>
         </div>
@@ -468,6 +480,7 @@
         </div>
 
         <div class="card" id="cp-result" style="display:none">
+          {% if is_admin %}<div id="debug-content-plan" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="cp-meta" id="cp-meta"></div>
           <div id="cp-reason-time"></div>
           <div class="cp-section">
@@ -562,6 +575,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-viral-reasoner" onclick="switchResultTab('viral','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-viral" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-viral"></div>
           <button class="btn-copy" onclick="copyResult('viral')">复制结果</button>
         </div>
@@ -635,6 +649,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-monetize-reasoner" onclick="switchResultTab('monetize','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-monetize" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-monetize"></div>
           <button class="btn-copy" onclick="copyResult('monetize')">复制结果</button>
         </div>
@@ -684,6 +699,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-script-reasoner" onclick="switchResultTab('script','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-script" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-script"></div>
           <button class="btn-copy" onclick="copyResult('script')">复制结果</button>
         </div>
@@ -708,6 +724,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-rewrite-reasoner" onclick="switchResultTab('rewrite','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-rewrite" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-rewrite"></div>
           <button class="btn-copy" onclick="copyResult('rewrite')">复制结果</button>
         </div>
@@ -749,13 +766,6 @@
           <button class="btn-secondary" id="bd-fetch-btn-reasoner" onclick="fetchVideoUrl('deepseek-reasoner')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px">🧠 深度思考</button>
         </div>
         <div id="bd-fetch-result" style="margin-top:10px"></div>
-        <div id="bd-prompt-preview" style="display:none;margin-top:8px;background:#f8f8ff;border:1px solid #e0e7ff;border-radius:8px;padding:10px 12px;font-size:12px;color:#555;line-height:1.6">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <span style="font-weight:600;color:#6366f1;font-size:11px">已发送的提示词</span>
-            <button onclick="copyBdPrompt()" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;font-family:inherit">复制</button>
-          </div>
-          <div id="bd-prompt-text" style="white-space:pre-wrap;word-break:break-all"></div>
-        </div>
 
         <!-- 分隔 -->
         <div style="display:flex; align-items:center; gap:10px; margin:18px 0;">
@@ -808,6 +818,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-breakdown-reasoner" onclick="switchResultTab('breakdown','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-breakdown" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-breakdown"></div>
           <button class="btn-copy" onclick="copyResult('breakdown')">复制结果</button>
           <button class="btn-imitate" onclick="goImitate()">✍️ 套用公式仿写</button>
@@ -860,6 +871,7 @@
                   onclick="switchResultTab('imitate','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-imitate" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-imitate"></div>
           <button class="btn-copy" onclick="copyResult('imitate')">复制结果</button>
         </div>
@@ -897,6 +909,7 @@
           <button class="result-tab" data-model="deepseek-reasoner" id="tab-director-reasoner" onclick="switchResultTab('director','deepseek-reasoner',this)">🧠 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
+          {% if is_admin %}<div id="debug-director" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-director"></div>
           <button class="btn-copy" onclick="copyResult('director')">复制结果</button>
         </div>
@@ -931,14 +944,16 @@
     <div class="bottom-nav-item" onclick="switchPanel('imitate', this)">
       <span class="b-icon">✍️</span><span class="b-label">仿写</span>
     </div>
-    <div class="bottom-nav-item" onclick="switchPanel('director', this)">
+    {% if is_admin %}<div class="bottom-nav-item" onclick="switchPanel('director', this)">
       <span class="b-icon">🎬</span><span class="b-label">编导</span>
-    </div>
+    </div>{% endif %}
   </div>
 
 </div><!-- /layout -->
 
 <script>
+  const IS_ADMIN = {{ is_admin | tojson }};
+
   // ── 面板切换 ──────────────────────────────────────────────────────────────
   function switchPanel(name, el) {
     // 面板
@@ -999,6 +1014,34 @@
 
   function getCheckedValues(groupId) {
     return Array.from(document.querySelectorAll('#' + groupId + ' input:checked')).map(i => i.value);
+  }
+
+  // ── Admin prompt debug ────────────────────────────────────────────────────
+  function showPromptDebug(name, sys, usr) {
+    const el = document.getElementById('debug-' + name);
+    if (!el) return;
+    const esc = s => s.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    el.innerHTML = `
+      <div class="prompt-debug-header" onclick="var b=this.nextElementSibling;b.classList.toggle('open');this.querySelector('.toggle-icon').textContent=b.classList.contains('open')?'▴':'▾'">
+        <span class="badge">ADMIN</span> Prompt Debug
+        <span class="toggle-icon" style="margin-left:auto">▾</span>
+      </div>
+      <div class="prompt-debug-body">
+        <div class="prompt-debug-section">
+          <div class="prompt-debug-label">System Prompt</div>
+          <div class="prompt-debug-text">${esc(sys)}</div>
+        </div>
+        <div class="prompt-debug-section">
+          <div class="prompt-debug-label">User Prompt</div>
+          <div class="prompt-debug-text">${esc(usr)}</div>
+        </div>
+      </div>`;
+    el.style.display = 'block';
+  }
+
+  function resetPromptDebug(name) {
+    const el = document.getElementById('debug-' + name);
+    if (el) { el.innerHTML = ''; el.style.display = 'none'; }
   }
 
   // ── 提交 ──────────────────────────────────────────────────────────────────
@@ -1182,7 +1225,20 @@
         const { done, value } = await reader.read();
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
-        contentEl.innerHTML = marked.parse(fullText);
+        // Strip debug prefix before rendering during streaming
+        const renderText = fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, '');
+        contentEl.innerHTML = marked.parse(renderText);
+      }
+      // Extract and display admin debug prompt
+      if (IS_ADMIN) {
+        const debugMatch = fullText.match(/^\[DEBUG:([\s\S]*?):DEBUG\]\n/);
+        if (debugMatch) {
+          try {
+            const dbg = JSON.parse(debugMatch[1]);
+            showPromptDebug(name, dbg.sys, dbg.usr);
+          } catch (_) {}
+          fullText = fullText.slice(debugMatch[0].length);
+        }
       }
       // 存入 store + 持久化
       resultStore[name][model] = fullText;
@@ -1242,6 +1298,17 @@
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
         clickedBtn.innerHTML = `<span class="spinner"></span>生成中 ${fullText.length} 字...`;
+      }
+      // Strip admin debug prefix if present
+      if (IS_ADMIN) {
+        const debugMatch = fullText.match(/^\[DEBUG:([\s\S]*?):DEBUG\]\n/);
+        if (debugMatch) {
+          try {
+            const dbg = JSON.parse(debugMatch[1]);
+            showPromptDebug('content-plan', dbg.sys, dbg.usr);
+          } catch (_) {}
+          fullText = fullText.slice(debugMatch[0].length);
+        }
       }
       // 去除可能的 markdown 代码块包裹
       let cleaned = fullText.trim();
@@ -1492,17 +1559,7 @@
     await fetchAndStreamSharetext(input, false, model);
   }
 
-  let _bdPrompt = '';
 
-  function copyBdPrompt() {
-    if (!_bdPrompt) return;
-    navigator.clipboard.writeText(_bdPrompt).then(() => {
-      const btn = document.querySelector('#bd-prompt-preview button');
-      const orig = btn.textContent;
-      btn.textContent = '已复制';
-      setTimeout(() => btn.textContent = orig, 1500);
-    });
-  }
 
   async function fetchAndStreamSharetext(sharetext, isRetry, model = 'deepseek-chat') {
     const btn         = document.getElementById('bd-fetch-btn');
@@ -1518,10 +1575,7 @@
     }
     if (!isRetry) {
       resultBox.innerHTML = '';
-      // Show prompt preview
-      _bdPrompt = `请抓取这个视频的标题、话题、文案内容，并进行视频拆解分析：${sharetext}`;
-      document.getElementById('bd-prompt-text').textContent = _bdPrompt;
-      document.getElementById('bd-prompt-preview').style.display = 'block';
+      if (IS_ADMIN) resetPromptDebug('breakdown');
     }
 
     const bar = document.getElementById('bd-analyzing-bar');
@@ -1548,7 +1602,14 @@
         const { done, value } = await reader.read();
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
-        contentEl.innerHTML = marked.parse(fullText);
+        contentEl.innerHTML = marked.parse(fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, ''));
+      }
+      if (IS_ADMIN) {
+        const debugMatch = fullText.match(/^\[DEBUG:([\s\S]*?):DEBUG\]\n/);
+        if (debugMatch) {
+          try { const dbg = JSON.parse(debugMatch[1]); showPromptDebug('breakdown', dbg.sys, dbg.usr); } catch (_) {}
+          fullText = fullText.slice(debugMatch[0].length);
+        }
       }
 
       // Auto-retry once if DeepSeek says it cannot fetch the video
@@ -1578,8 +1639,6 @@
     const resultBox = document.getElementById('bd-fetch-result');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span>';
-    document.getElementById('bd-prompt-preview').style.display = 'none';
-    _bdPrompt = '';
     resultBox.innerHTML = '';
 
     try {
