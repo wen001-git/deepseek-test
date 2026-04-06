@@ -584,9 +584,40 @@ def search_weixin_video(topic: str) -> tuple:
                         href = 'https://weixin.sogou.com' + href
                     snippets = item.xpath('.//*[contains(@class,"txt")]//text()')
                     snippet  = re.sub(r'\s+', ' ', ' '.join(snippets)).strip()[:120]
-                    account_els = item.xpath('.//*[contains(@class,"account")]//text()')
-                    account = account_els[0].strip() if account_els else ''
-                    display = f"{account}：{snippet}" if account and snippet else (account or snippet)
+
+                    # Account name — try several common Sogou class patterns
+                    account = ''
+                    for axp in ('.//*[contains(@class,"account")]//text()',
+                                './/*[contains(@class,"s-p")]//text()',
+                                './/*[contains(@class,"author")]//text()'):
+                        els = item.xpath(axp)
+                        if els:
+                            account = els[0].strip()
+                            break
+
+                    # Date — try common time/date class patterns
+                    date = ''
+                    for dxp in ('.//*[contains(@class,"time")]//text()',
+                                './/span[contains(@class,"date")]//text()',
+                                './/p[contains(@class,"s-p2")]//text()'):
+                        els = item.xpath(dxp)
+                        if els:
+                            date = els[0].strip()
+                            break
+
+                    # Build display like B站's "UP: author · date"
+                    meta_parts = []
+                    if account:
+                        meta_parts.append(f"公号: {account}")
+                    if date:
+                        meta_parts.append(date)
+                    if meta_parts:
+                        display = '  ·  '.join(meta_parts)
+                        if snippet and not account:
+                            display += f"  {snippet[:60]}"
+                    else:
+                        display = snippet[:80]
+
                     results.append({'title': title, 'url': href, 'snippet': display,
                                      'platform': '视频号', 'source': 'real'})
             else:

@@ -132,7 +132,13 @@ def api_topics_monetize():
     industry = data.get("industry", "").strip()
     if not industry:
         return jsonify({"error": "请选择赛道领域"}), 400
-    prompt = build_monetize_topic_prompt(industry, data.get("followers", "0 - 1千"), data.get("strengths", ""))
+    prompt = build_monetize_topic_prompt(
+        industry,
+        data.get("followers", "0 - 1千"),
+        data.get("strengths", ""),
+        data.get("monetize_direction", ""),
+        data.get("content_tone", []),
+    )
     return stream_response(MONETIZE_TOPIC_SYSTEM_PROMPT, prompt, data.get("model"))
 
 

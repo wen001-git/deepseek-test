@@ -596,6 +596,34 @@
           {% for f in follower_ranges %}<option value="{{ f }}">{{ f }}</option>{% endfor %}
         </select>
 
+        <div style="margin-top:12px;">
+          <div style="display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; -webkit-user-select:none;"
+               onclick="var p=document.getElementById('mon-direction-panel'); p.style.display=p.style.display==='none'?'block':'none'; this.querySelector('.chip-toggle-hint').textContent=p.style.display==='none'?'点击展开 ▾':'收起 ▴'">
+            <span style="font-size:13px; color:#6366f1; font-weight:600;">🎯 精准选题方向（选填）</span>
+            <span class="chip-toggle-hint" style="font-size:11px; color:#999;">收起 ▴</span>
+          </div>
+
+          <div id="mon-direction-panel" style="display:block; margin-top:10px;">
+            <div style="font-size:12px; color:#666; margin-bottom:6px;">变现方式（单选）</div>
+            <div id="mon-monetize-dir" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+              <span class="chip" onclick="toggleChipSingle(this,'mon-monetize-dir')">广告接单</span>
+              <span class="chip" onclick="toggleChipSingle(this,'mon-monetize-dir')">带货变现</span>
+              <span class="chip" onclick="toggleChipSingle(this,'mon-monetize-dir')">知识付费</span>
+              <span class="chip" onclick="toggleChipSingle(this,'mon-monetize-dir')">私域引流</span>
+              <span class="chip" onclick="toggleChipSingle(this,'mon-monetize-dir')">直播带货</span>
+            </div>
+
+            <div style="font-size:12px; color:#666; margin-bottom:6px;">内容调性（可多选）</div>
+            <div id="mon-content-tone" style="display:flex; flex-wrap:wrap; gap:8px;">
+              <span class="chip" onclick="toggleChipMulti(this)">种草氛围</span>
+              <span class="chip" onclick="toggleChipMulti(this)">专业信任</span>
+              <span class="chip" onclick="toggleChipMulti(this)">生活场景</span>
+              <span class="chip" onclick="toggleChipMulti(this)">测评对比</span>
+              <span class="chip" onclick="toggleChipMulti(this)">教程干货</span>
+            </div>
+          </div>
+        </div>
+
         <div class="btn-group">
           <button class="btn-primary" onclick="submit('monetize','deepseek-chat')">⚡ 快速生成</button>
           <button class="btn-secondary" onclick="submit('monetize','deepseek-reasoner')">🧠 深度思考</button>
@@ -1008,9 +1036,11 @@
       case 'monetize':
         saveMonHistory();
         return {
-          industry:  document.getElementById('mon-industry').value,
-          strengths: document.getElementById('mon-strengths').value,
-          followers: document.getElementById('mon-followers').value,
+          industry:           document.getElementById('mon-industry').value,
+          strengths:          document.getElementById('mon-strengths').value,
+          followers:          document.getElementById('mon-followers').value,
+          monetize_direction: (document.querySelector('#mon-monetize-dir .chip.selected') || {}).textContent || '',
+          content_tone:       [...document.querySelectorAll('#mon-content-tone .chip.selected')].map(c => c.textContent),
         };
       case 'script': return {
         topic:    document.getElementById('script-topic').value,
