@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, render_template, Response, stream_wit
 from deepseek_client import generate_stream
 from database import init_db
 from search_client import search_bilibili, search_youtube, search_weixin_video, fetch_video_from_url, fetch_video_content
+from database import get_user_by_id, get_user_devices
 from auth import auth_bp
 from admin import admin_bp
 from prompts import (
@@ -57,9 +58,17 @@ def stream_response(system_prompt, user_prompt, model):
 
 @app.route("/")
 def index():
+    user = get_user_by_id(session.get('user_id')) or {}
+    devices = get_user_devices(session.get('user_id')) if session.get('user_id') else []
     return render_template(
         "index.html",
         is_admin=session.get('role') == 'admin',
+        profile_username=session.get('username', ''),
+        profile_role=session.get('role', 'user'),
+        profile_expires=user['expires_at'] if user else None,
+        profile_devices=len(devices),
+        profile_created=str(user['created_at'] or '')[:10] if user else '',
+        today=__import__('datetime').date.today().isoformat(),
         video_types=VIDEO_TYPES,
         styles=STYLES,
         industries=INDUSTRIES,
