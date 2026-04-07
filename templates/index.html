@@ -204,6 +204,12 @@
     /* spinner */
     .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
 
+    /* 分镜拍摄表 */
+    #shot-table-content table { border-collapse: collapse; min-width: 700px; width: 100%; }
+    #shot-table-content th { background:#f8f8ff; padding:8px 10px; text-align:left; border:1px solid #e5e7eb; font-size:12px; white-space:nowrap; color:#555; }
+    #shot-table-content td { padding:8px 10px; border:1px solid #e5e7eb; font-size:12px; vertical-align:top; line-height:1.5; }
+    #shot-table-content tr:nth-child(even) td { background:#fafafa; }
+
     /* 我的账号面板 */
     .profile-hero { text-align:center; padding: 32px 16px 24px; }
     .profile-avatar { width:72px; height:72px; border-radius:50%; background:linear-gradient(135deg,#6366f1,#a5b4fc); color:#fff; font-size:32px; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; }
@@ -711,7 +717,8 @@
       <div class="panel-desc">输入视频主题，AI 生成完整拍摄脚本（含台词和镜头说明）</div>
       <div class="card">
         <label>视频主题</label>
-        <input type="text" id="script-topic" placeholder="例如：北京最好吃的烤鸭">
+        <input type="text" id="script-topic" placeholder="例如：北京最好吃的烤鸭" list="script-topic-history" autocomplete="off">
+        <datalist id="script-topic-history"></datalist>
 
         <div class="row">
           <div>
@@ -729,13 +736,17 @@
           </div>
         </div>
 
-        <label>视频时长</label>
-        <select id="script-duration">
+        <label>视频时长（秒）</label>
+        <input type="number" id="script-duration" value="60" min="10" max="600" placeholder="输入秒数，如 60" list="script-duration-presets" style="width:100%">
+        <datalist id="script-duration-presets">
+          <option value="15">15 秒</option>
           <option value="30">30 秒</option>
-          <option value="60" selected>60 秒</option>
+          <option value="60">60 秒</option>
           <option value="90">90 秒</option>
+          <option value="120">2 分钟</option>
           <option value="180">3 分钟</option>
-        </select>
+          <option value="300">5 分钟</option>
+        </datalist>
 
         <div class="btn-group">
           <button class="btn-primary" onclick="submit('script','deepseek-chat')">⚡ 快速生成</button>
@@ -751,7 +762,22 @@
           {% if is_admin %}<div id="debug-script" class="prompt-debug" style="display:none"></div>{% endif %}
           <div class="result-content" id="content-script"></div>
           <button class="btn-copy" onclick="copyResult('script')">复制结果</button>
+          <div style="margin-top:14px;border-top:1px solid #f0f0f0;padding-top:14px">
+            <button id="shot-table-btn" onclick="generateShotTable()" style="width:100%;padding:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:0.3px;box-shadow:0 2px 8px rgba(99,102,241,0.35);transition:opacity 0.2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">📋 生成分镜拍摄表</button>
+          </div>
         </div>
+      </div>
+      <!-- 分镜拍摄表结果 -->
+      <div class="result-card" id="result-shot-table" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-weight:700;font-size:14px;color:#1a1a2e">📋 分镜拍摄表</span>
+          <button class="btn-copy" onclick="copyText(document.getElementById('shot-table-content').innerText)" style="margin:0">复制表格</button>
+        </div>
+        {% if is_admin %}<div id="debug-shot-table" class="prompt-debug" style="display:none"></div>{% endif %}
+        <div style="margin-bottom:10px;padding:8px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#92400e;line-height:1.6">
+          💡 <strong>提示</strong>：提示词列同时提供中文（理解用）和英文（EN: 开头）。建议直接复制 <strong>EN: 开头的英文部分</strong>粘贴到 Midjourney / Kling / Runway 等工具，英文提示词效果更好。
+        </div>
+        <div id="shot-table-content" style="overflow-x:auto;font-size:13px"></div>
       </div>
     </div>
 
@@ -1305,6 +1331,7 @@
 
     try {
       if (name === 'positioning') savePositioningHistory();
+      if (name === 'script') saveScriptTopicHistory(document.getElementById('script-topic').value);
       const payload = { ...getPayload(name), model: model };
       const res = await fetch(API_MAP[name], {
         method: 'POST',
@@ -1573,6 +1600,75 @@
     const navEl = document.querySelector(".nav-item[onclick*=\"'script'\"]");
     switchPanel('script', navEl);
   }
+
+  async function generateShotTable() {
+    const activeTab = document.querySelector('#result-script .result-tab.active');
+    const model = activeTab?.dataset.model || 'deepseek-chat';
+    const script = resultStore['script']?.[model] || '';
+    if (!script) { alert('请先生成脚本'); return; }
+
+    const btn = document.getElementById('shot-table-btn');
+    const resultEl = document.getElementById('result-shot-table');
+    const contentEl = document.getElementById('shot-table-content');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner" style="border-color:rgba(99,102,241,0.3);border-top-color:#6366f1"></span> 生成中...';
+    resultEl.style.display = 'block';
+    contentEl.innerHTML = '<span style="color:#bbb;font-size:13px">正在生成分镜表，请稍候...</span>';
+    resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    try {
+      const res = await fetch('/api/shot-table', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script, model }),
+      });
+      if (!res.ok) throw new Error('请求失败');
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        const rendered = fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, '');
+        if (rendered.trim()) contentEl.innerHTML = marked.parse(rendered);
+      }
+      if (IS_ADMIN) {
+        const debugMatch = fullText.match(/^\[DEBUG:([\s\S]*?):DEBUG\]\n/);
+        if (debugMatch) {
+          try { const dbg = JSON.parse(debugMatch[1]); showPromptDebug('shot-table', dbg.sys, dbg.usr); } catch (_) {}
+        }
+      }
+    } catch (e) {
+      contentEl.innerHTML = `<span style="color:#ef4444">生成失败：${e.message}</span>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '📋 重新生成分镜拍摄表';
+    }
+  }
+
+  function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => alert('已复制到剪贴板'));
+  }
+
+  // ── Script topic history ──────────────────────────────────────────────────
+  function saveScriptTopicHistory(topic) {
+    if (!topic.trim()) return;
+    const key = 'scriptTopicHistory';
+    let hist = JSON.parse(localStorage.getItem(key) || '[]');
+    hist = [topic, ...hist.filter(t => t !== topic)].slice(0, 15);
+    localStorage.setItem(key, JSON.stringify(hist));
+    const dl = document.getElementById('script-topic-history');
+    if (dl) {
+      dl.innerHTML = hist.map(t => `<option value="${t.replace(/"/g,'&quot;')}">`).join('');
+    }
+  }
+  function loadScriptTopicHistory() {
+    const hist = JSON.parse(localStorage.getItem('scriptTopicHistory') || '[]');
+    const dl = document.getElementById('script-topic-history');
+    if (dl) dl.innerHTML = hist.map(t => `<option value="${t.replace(/"/g,'&quot;')}">`).join('');
+  }
+  loadScriptTopicHistory();
 
   function copyResult(name) {
     const activeTab = document.querySelector(`#result-${name} .result-tab.active`);

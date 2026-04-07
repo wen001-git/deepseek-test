@@ -13,6 +13,7 @@ from prompts import (
     ACCOUNT_TYPES, CONTENT_STYLES, CONTENT_FORMATS, build_positioning_prompt,
     VIRAL_TOPIC_SYSTEM_PROMPT, build_viral_topic_prompt,
     MONETIZE_TOPIC_SYSTEM_PROMPT, FOLLOWER_RANGES, build_monetize_topic_prompt,
+    SHOT_TABLE_SYSTEM_PROMPT, build_shot_table_prompt,
     REWRITE_SYSTEM_PROMPT, build_rewrite_prompt,
     BREAKDOWN_SYSTEM_PROMPT, build_breakdown_prompt, build_breakdown_sharetext_prompt,
     IMITATE_SYSTEM_PROMPT, build_imitate_prompt,
@@ -99,6 +100,17 @@ def api_script():
         int(data.get("duration", 60)),
     )
     return stream_response(SCRIPT_SYSTEM_PROMPT, prompt, data.get("model"))
+
+
+# ─── 分镜拍摄表 ──────────────────────────────────────────────────────────────
+
+@app.route("/api/shot-table", methods=["POST"])
+def api_shot_table():
+    data = request.get_json()
+    script = data.get("script", "").strip()
+    if not script:
+        return jsonify({"error": "请先生成脚本"}), 400
+    return stream_response(SHOT_TABLE_SYSTEM_PROMPT, build_shot_table_prompt(script), data.get("model"))
 
 
 # ─── 定位分析 ────────────────────────────────────────────────────────────────
