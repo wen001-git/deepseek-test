@@ -224,6 +224,21 @@
     .cal-day.selected { box-shadow: 0 0 0 3px #fff, 0 0 0 5px currentColor; transform: scale(1.1); }
     .cal-day-appear { animation: calPop 0.18s cubic-bezier(0.34,1.56,0.64,1) both; }
     @keyframes calPop { from { opacity:0; transform:scale(0.2); } to { opacity:1; transform:scale(1); } }
+    /* ── Calendar clickability hints ── */
+    .cal-day { position: relative; }
+    .cal-day::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
+    @keyframes calSonar {
+      0%   { box-shadow: 0 0 0 0    currentColor; opacity: 0.7; }
+      80%  { box-shadow: 0 0 0 10px currentColor; opacity: 0;   }
+      100% { box-shadow: 0 0 0 10px currentColor; opacity: 0;   }
+    }
+    .cal-day-sonar { animation: calSonar 0.9s ease-out 3; }
+    .cal-day-sonar.selected { animation: none; }
+    @keyframes calHintBounce {
+      0%, 60%, 100% { transform: translateY(0);   }
+      30%            { transform: translateY(-4px); }
+    }
+    .cal-tooltip.empty.cal-hint-bounce { animation: calHintBounce 1.1s ease-in-out 3; animation-delay: 1.4s; }
     .cal-tooltip { border-radius: 10px; padding: 10px 14px; font-size: 13px; margin-bottom: 8px; line-height: 1.6; background: #f0f4ff; border-left: 3px solid #6366f1; color: #333; min-height: 42px; }
     .cal-tooltip .btn-goto-script { margin-top: 8px; display: inline-block; }
     .cal-tooltip.empty { color: #bbb; font-size: 12px; border-left-color: #e5e7eb; background: #fafafa; }
@@ -490,7 +505,7 @@
           </div>
           <div class="cp-section">
             <div class="cp-section-title">📅 30天内容日历</div>
-            <div class="cal-tooltip empty" id="cp-tooltip">点击任意日期查看当日主题</div>
+            <div class="cal-tooltip empty cal-hint-bounce" id="cp-tooltip">👆 点击任意日期查看当日主题</div>
             <div class="calendar-grid" id="cp-calendar"></div>
           </div>
           <div class="cp-section">
@@ -956,6 +971,7 @@
 
 <script>
   const IS_ADMIN = {{ is_admin | tojson }};
+  let calHinted = false;
 
   // ── 面板切换 ──────────────────────────────────────────────────────────────
   function switchPanel(name, el) {
@@ -1346,8 +1362,9 @@
 
     // calendar — 由 weekly_template 循环生成30天，逐个弹入
     const tooltipEl = document.getElementById('cp-tooltip');
-    tooltipEl.className = 'cal-tooltip empty';
-    tooltipEl.textContent = '点击任意日期查看当日主题';
+    tooltipEl.className = 'cal-tooltip empty cal-hint-bounce';
+    tooltipEl.textContent = '👆 点击任意日期查看当日主题';
+    calHinted = false;
     const WEEK_ORDER = ['周一','周二','周三','周四','周五','周六','周日'];
     const weekMap = {};
     (data.weekly_template || []).forEach(w => { weekMap[w.day] = w; });
@@ -1367,6 +1384,23 @@
         div.setAttribute('onclick', `showCalTip(${d.day},'${d.type}','${safeTheme}','${color}')`);
         div.textContent = d.day;
         calEl.appendChild(div);
+
+        if (i === 29) {
+          setTimeout(() => {
+            if (calHinted) return;
+            const firstDot = calEl.querySelector('.cal-day');
+            if (!firstDot) return;
+            firstDot.classList.add('selected');
+            const d1 = thirtyDayPlan[0];
+            const d1color = colorMap[d1.type] || '#999';
+            const d1theme = (d1.theme || '').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+            const el = document.getElementById('cp-tooltip');
+            el.className = 'cal-tooltip';
+            el.innerHTML = `<strong>第1天</strong> · <span style="color:${d1color};font-weight:600">${d1.type}</span><br><span style="color:#666">${d1theme}</span><br><button class="btn-goto-script" onclick="goToScript('${d1theme.replace(/'/g,"\\'")}')">✏️ 制作脚本</button>`;
+            firstDot.classList.add('cal-day-sonar');
+            firstDot.addEventListener('animationend', () => firstDot.classList.remove('cal-day-sonar'), { once: true });
+          }, 200);
+        }
       }, i * 40);
     });
 
@@ -1418,7 +1452,12 @@
   }
 
   function showCalTip(day, type, theme, color) {
-    // 取消上一个选中状态
+    if (!calHinted) {
+      calHinted = true;
+      const firstDot = document.querySelector('#cp-calendar .cal-day');
+      if (firstDot) firstDot.classList.remove('cal-day-sonar');
+      document.getElementById('cp-tooltip').classList.remove('cal-hint-bounce');
+    }
     document.querySelectorAll('.cal-day.selected').forEach(d => d.classList.remove('selected'));
     event.currentTarget.classList.add('selected');
     const el = document.getElementById('cp-tooltip');
@@ -1555,7 +1594,7 @@
     const isYouTube  = /youtube\.com|youtu\.be/.test(input);
     const isBilibili = /bilibili\.com|b23\.tv/.test(input);
     if ((isYouTube || isBilibili) && !input.includes('\n') && !input.includes(' ')) {
-      return fetchVideoUrlLegacy(input);
+      return fetchVideoUrlLegacy(input, model);
     }
 
     // Everything else (Douyin, share text blobs, etc.) → DeepSeek direct
@@ -1564,7 +1603,7 @@
 
 
 
-  async function fetchAndStreamSharetext(sharetext, isRetry, model = 'deepseek-chat') {
+  async function fetchAndStreamSharetext(sharetext, isRetry, model = 'deepseek-chat', prefetchedContent = '') {
     const btn         = document.getElementById('bd-fetch-btn');
     const btnReasoner = document.getElementById('bd-fetch-btn-reasoner');
     const resultBox   = document.getElementById('bd-fetch-result');
@@ -1594,7 +1633,7 @@
       const res = await fetch('/api/breakdown-sharetext', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sharetext, model }),
+        body: JSON.stringify({ sharetext, model, fetched_content: prefetchedContent }),
       });
       if (!res.ok) throw new Error('请求失败');
 
@@ -1637,7 +1676,7 @@
     }
   }
 
-  async function fetchVideoUrlLegacy(url) {
+  async function fetchVideoUrlLegacy(url, model = 'deepseek-chat') {
     const btn = document.getElementById('bd-fetch-btn');
     const resultBox = document.getElementById('bd-fetch-result');
     btn.disabled = true;
@@ -1678,7 +1717,19 @@
           ${item.title ? '<div style="font-size:11px;color:#6366f1;margin-top:6px">点击自动填入并开始分析 →</div>' : ''}
         </div>`;
 
-      if (item.title) {
+      if (item.fetched_content) {
+        // Rich metadata available — use the same path as Douyin for full stats in prompt
+        resultBox.innerHTML = `
+          <div class="bd-result-card">
+            <div style="font-size:14px;font-weight:600;color:#1a1a2e;margin-bottom:4px">${escapeHtml(item.title)}</div>
+            <div class="bd-result-meta">
+              <span class="bd-platform-badge" style="background:${BD_PLATFORM_COLORS[item.platform] || '#888'}">${escapeHtml(item.platform)}</span>
+              <span style="color:#16a34a;font-size:11px;margin-left:6px">✓ 已获取完整视频数据</span>
+            </div>
+            <div style="font-size:12px;color:#888">${escapeHtml(item.snippet || '')}</div>
+          </div>`;
+        await fetchAndStreamSharetext(item.url, false, model, item.fetched_content);
+      } else if (item.title) {
         // Auto-start analysis immediately — no extra click needed
         bdSelectResult(item.title, item.url, item.snippet, null, item.transcript || '');
       } else {

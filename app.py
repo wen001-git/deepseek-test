@@ -219,11 +219,13 @@ def api_breakdown_sharetext():
     sharetext = data.get("sharetext", "").strip()
     if not sharetext:
         return jsonify({"error": "请粘贴视频链接或分享文案"}), 400
-    fetched_content = None
-    url_match = re.search(r'https?://\S+', sharetext)
-    if url_match:
-        fetched_content = fetch_video_content(url_match.group(0), sharetext=sharetext)
-    prompt = build_breakdown_sharetext_prompt(sharetext, fetched_content or '')
+    # Accept pre-fetched content from frontend (e.g. from /api/fetch-url for B站/YouTube)
+    fetched_content = data.get("fetched_content", "").strip()
+    if not fetched_content:
+        url_match = re.search(r'https?://\S+', sharetext)
+        if url_match:
+            fetched_content = fetch_video_content(url_match.group(0), sharetext=sharetext) or ''
+    prompt = build_breakdown_sharetext_prompt(sharetext, fetched_content)
     system = BREAKDOWN_SYSTEM_PROMPT if fetched_content else ""
     return stream_response(system, prompt, data.get("model"))
 

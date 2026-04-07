@@ -691,15 +691,34 @@ def fetch_video_from_url(url: str) -> tuple:
                 data = resp.json()
                 if data.get("code") == 0:
                     v    = data["data"]
-                    play = _fmt_play(v.get("stat", {}).get("view", 0))
+                    stat = v.get("stat", {})
                     name = v.get("owner", {}).get("name", "")
                     desc = v.get("desc", "").strip()
+                    title = v.get("title", "")
+
+                    stat_parts = []
+                    if stat.get("view"):     stat_parts.append(f"播放 {_fmt_play(stat['view'])}")
+                    if stat.get("like"):     stat_parts.append(f"点赞 {_fmt_play(stat['like'])}")
+                    if stat.get("reply"):    stat_parts.append(f"评论 {_fmt_play(stat['reply'])}")
+                    if stat.get("favorite"): stat_parts.append(f"收藏 {_fmt_play(stat['favorite'])}")
+                    if stat.get("share"):    stat_parts.append(f"分享 {_fmt_play(stat['share'])}")
+                    if stat.get("coin"):     stat_parts.append(f"投币 {_fmt_play(stat['coin'])}")
+                    if stat.get("danmaku"):  stat_parts.append(f"弹幕 {_fmt_play(stat['danmaku'])}")
+                    stats_line = "  |  ".join(stat_parts)
+                    play = _fmt_play(stat.get("view", 0))
+
+                    fc_parts = [f"标题：{title}"]
+                    if name: fc_parts.append(f"发布者：{name}")
+                    if desc: fc_parts.append(f"视频简介：{desc[:400]}")
+                    if stats_line: fc_parts.append(f"视频数据：{stats_line}")
+
                     return {
-                        "title":    v.get("title", ""),
-                        "url":      f"https://www.bilibili.com/video/{bvid}",
-                        "snippet":  f"▶ {play} 播放  ·  UP: {name}" + (f"\n{desc[:100]}" if desc else ""),
-                        "platform": "B站",
-                        "source":   "real",
+                        "title":           title,
+                        "url":             f"https://www.bilibili.com/video/{bvid}",
+                        "snippet":         f"▶ {play} 播放  ·  UP: {name}" + (f"\n{desc[:100]}" if desc else ""),
+                        "platform":        "B站",
+                        "source":          "real",
+                        "fetched_content": "\n".join(fc_parts),
                     }, None
             except Exception:
                 pass
@@ -718,16 +737,35 @@ def fetch_video_from_url(url: str) -> tuple:
                 items = sr.json().get("items", [])
                 if items:
                     v    = items[0]
-                    play = _fmt_play(v.get("statistics", {}).get("viewCount", ""))
                     sn   = v.get("snippet", {})
+                    stats = v.get("statistics", {})
                     transcript = _fetch_yt_transcript(vid)
+                    title = sn.get("title", "")
+                    channel = sn.get("channelTitle", "")
+                    desc = sn.get("description", "").strip()
+                    tags = sn.get("tags", [])[:10]
+
+                    stat_parts = []
+                    if stats.get("viewCount"):    stat_parts.append(f"播放 {_fmt_play(stats['viewCount'])}")
+                    if stats.get("likeCount"):    stat_parts.append(f"点赞 {_fmt_play(stats['likeCount'])}")
+                    if stats.get("commentCount"): stat_parts.append(f"评论 {_fmt_play(stats['commentCount'])}")
+                    stats_line = "  |  ".join(stat_parts)
+                    play = _fmt_play(stats.get("viewCount", ""))
+
+                    fc_parts = [f"标题：{title}"]
+                    if channel: fc_parts.append(f"发布者：{channel}")
+                    if tags: fc_parts.append(f"话题标签：{'  '.join('#' + t for t in tags)}")
+                    if desc: fc_parts.append(f"视频简介：{desc[:400]}")
+                    if stats_line: fc_parts.append(f"视频数据：{stats_line}")
+                    if transcript: fc_parts.append(f"视频字幕：{transcript}")
+
                     return {
-                        "title":      sn.get("title", ""),
-                        "url":        f"https://www.youtube.com/watch?v={vid}",
-                        "snippet":    f"▶ {play} 播放  ·  {sn.get('channelTitle', '')}",
-                        "platform":   "YouTube",
-                        "source":     "real",
-                        "transcript": transcript,
+                        "title":           title,
+                        "url":             f"https://www.youtube.com/watch?v={vid}",
+                        "snippet":         f"▶ {play} 播放  ·  {channel}",
+                        "platform":        "YouTube",
+                        "source":          "real",
+                        "fetched_content": "\n".join(fc_parts),
                     }, None
             except Exception:
                 pass

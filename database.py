@@ -33,12 +33,16 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
     """)
-    # 兼容旧库：尝试添加 plain_password 列（已存在则忽略）
-    try:
-        conn.execute("ALTER TABLE users ADD COLUMN plain_password TEXT DEFAULT ''")
-        conn.commit()
-    except Exception:
-        pass
+    # 兼容旧库：尝试添加缺失列（已存在则忽略）
+    for col, definition in [
+        ("plain_password", "TEXT DEFAULT ''"),
+        ("expires_at", "TEXT DEFAULT NULL"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            conn.commit()
+        except Exception:
+            pass
 
     # 创建默认管理员账号（如果不存在）
     existing = conn.execute("SELECT id FROM users WHERE username = 'admin'").fetchone()
@@ -74,12 +78,12 @@ def get_all_users():
     conn.close()
     return users
 
-def create_user(username, password, role='user', notes=''):
+def create_user(username, password, role='user', notes='', expires_at=None):
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO users (username, password_hash, plain_password, role, notes) VALUES (?, ?, ?, ?, ?)",
-            (username, generate_password_hash(password, method='pbkdf2:sha256'), password, role, notes)
+            "INSERT INTO users (username, password_hash, plain_password, role, notes, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password, method='pbkdf2:sha256'), password, role, notes, expires_at or None)
         )
         conn.commit()
         return True, None
@@ -87,6 +91,13 @@ def create_user(username, password, role='user', notes=''):
         return False, '用户名已存在'
     finally:
         conn.close()
+
+
+def update_user_expiry(user_id, expires_at):
+    conn = get_db()
+    conn.execute("UPDATE users SET expires_at = ? WHERE id = ?", (expires_at or None, user_id))
+    conn.commit()
+    conn.close()
 
 def delete_user(user_id):
     conn = get_db()

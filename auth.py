@@ -1,3 +1,4 @@
+from datetime import date
 from flask import Blueprint, request, session, redirect, render_template, jsonify
 from werkzeug.security import check_password_hash
 from database import get_user_by_username, check_and_register_device
@@ -28,6 +29,8 @@ def login():
             error = '用户名或密码错误'
         elif not user['is_active']:
             error = '账号已被禁用，请联系管理员'
+        elif user['expires_at'] and date.today().isoformat() > user['expires_at']:
+            error = '账号已过期，请联系管理员续期'
         elif fingerprint == 'unknown':
             error = '设备识别失败，请刷新页面后重试'
         else:

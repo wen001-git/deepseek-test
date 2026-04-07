@@ -44,13 +44,20 @@
     .device-count { font-weight: 700; color: #6366f1; }
     .device-count.full { color: #ef4444; }
 
-    /* 备注 inline edit */
+    /* 备注 / 到期日 inline edit */
     .notes-cell { display: flex; align-items: center; gap: 6px; }
     .notes-text { flex: 1; color: #555; font-size: 12px; min-width: 80px; }
     .notes-input { flex: 1; padding: 4px 8px; border: 1.5px solid #e5e7eb; border-radius: 6px; font-size: 12px; font-family: inherit; color: #333; background: #fafafa; outline: none; display: none; }
     .notes-input:focus { border-color: #6366f1; background: #fff; }
     .btn-edit-notes { font-size: 11px; color: #aaa; cursor: pointer; background: none; border: none; padding: 2px 4px; }
     .btn-edit-notes:hover { color: #6366f1; }
+
+    /* 到期日 */
+    .expiry-cell { display: flex; align-items: center; gap: 6px; }
+    .expiry-text { font-size: 12px; color: #555; min-width: 70px; }
+    .expiry-text.expired { color: #ef4444; font-weight: 600; }
+    .expiry-input { padding: 3px 6px; border: 1.5px solid #e5e7eb; border-radius: 6px; font-size: 12px; font-family: inherit; color: #333; background: #fafafa; outline: none; display: none; }
+    .expiry-input:focus { border-color: #6366f1; background: #fff; }
 
     /* 密码列 */
     .pwd-cell { display: flex; align-items: center; gap: 4px; }
@@ -131,6 +138,10 @@
           <label>备注（选填）</label>
           <input type="text" name="notes" placeholder="如：客户A - 北京">
         </div>
+        <div class="form-group" style="min-width:130px;max-width:160px">
+          <label>到期日（选填）</label>
+          <input type="date" name="expires_at">
+        </div>
         <button type="submit" class="btn-add">+ 添加</button>
       </div>
     </form>
@@ -150,6 +161,7 @@
           <th>备注</th>
           <th>角色</th>
           <th>设备</th>
+          <th>到期日</th>
           <th>创建时间</th>
           <th>操作</th>
         </tr>
@@ -184,6 +196,23 @@
             <button class="btn-devices" onclick="toggleDevices({{ u.id }})" id="dev-btn-{{ u.id }}">▶ 详情</button>
             {% endif %}
           </td>
+          <td>
+            {% if u.role != 'admin' %}
+            <div class="expiry-cell">
+              <span class="expiry-text {% if u.expires_at and u.expires_at < today %}expired{% endif %}"
+                    id="expiry-text-{{ u.id }}">
+                {{ u.expires_at or '永久' }}
+              </span>
+              <input class="expiry-input" type="date" id="expiry-input-{{ u.id }}"
+                     value="{{ u.expires_at or '' }}"
+                     onblur="saveExpiry({{ u.id }})"
+                     onkeydown="if(event.key==='Enter')saveExpiry({{ u.id }});if(event.key==='Escape')cancelExpiry({{ u.id }})">
+              <button class="btn-edit-notes" onclick="editExpiry({{ u.id }})" title="修改到期日">✏️</button>
+            </div>
+            {% else %}
+            <span style="color:#aaa;font-size:12px">永久</span>
+            {% endif %}
+          </td>
           <td style="color:#999;font-size:12px">{{ u.created_at[:10] }}</td>
           <td>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -207,7 +236,7 @@
         </tr>
         <!-- 设备详情展开行 -->
         <tr class="device-detail-row" id="dev-row-{{ u.id }}">
-          <td colspan="7">
+          <td colspan="8">
             <div class="device-list">
               {% if devs %}
                 {% for d in devs %}
@@ -293,6 +322,35 @@
     input.style.display = 'inline-block';
     saveBtn.style.display = 'inline-block';
     input.focus();
+  }
+
+  function editExpiry(id) {
+    document.getElementById('expiry-text-' + id).style.display = 'none';
+    const input = document.getElementById('expiry-input-' + id);
+    input.style.display = 'inline-block';
+    input.focus();
+  }
+
+  function cancelExpiry(id) {
+    document.getElementById('expiry-input-' + id).style.display = 'none';
+    document.getElementById('expiry-text-' + id).style.display = '';
+  }
+
+  function saveExpiry(id) {
+    const input = document.getElementById('expiry-input-' + id);
+    const text = document.getElementById('expiry-text-' + id);
+    const expires_at = input.value || null;
+    fetch('/admin/users/expiry/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expires_at })
+    }).then(() => {
+      const today = new Date().toISOString().slice(0, 10);
+      text.textContent = expires_at || '永久';
+      text.classList.toggle('expired', !!expires_at && expires_at < today);
+      input.style.display = 'none';
+      text.style.display = '';
+    });
   }
 
   async function savePassword(id) {
