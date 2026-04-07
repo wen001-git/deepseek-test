@@ -1210,8 +1210,14 @@
 
     allBtns.forEach(b => b.disabled = true);
     if (clickedBtn) clickedBtn.innerHTML = '<span class="spinner"></span>生成中...';
-    contentEl.textContent = '';
-    resultCard.classList.remove('show');
+    contentEl.innerHTML = '<span style="color:#bbb;font-size:13px"><span class="spinner"></span> 正在连接 AI，请稍候...</span>';
+    resultCard.classList.add('show');
+    setTimeout(() => resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    // 切换到当前模型的 tab
+    const tabSuffix = model === 'deepseek-chat' ? 'chat' : 'reasoner';
+    document.querySelectorAll(`#result-${name} .result-tab`).forEach(t => t.classList.remove('active'));
+    const activeTab = document.getElementById(`tab-${name}-${tabSuffix}`);
+    if (activeTab) activeTab.classList.add('active', 'has-result');
 
     try {
       if (name === 'positioning') savePositioningHistory();
@@ -1230,14 +1236,6 @@
       // 流式读取 + markdown 渲染
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      resultCard.classList.add('show');
-      setTimeout(() => resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-
-      // 切换到当前模型的 tab
-      const tabSuffix = model === 'deepseek-chat' ? 'chat' : 'reasoner';
-      document.querySelectorAll(`#result-${name} .result-tab`).forEach(t => t.classList.remove('active'));
-      const activeTab = document.getElementById(`tab-${name}-${tabSuffix}`);
-      if (activeTab) activeTab.classList.add('active', 'has-result');
 
       let fullText = '';
       while (true) {
