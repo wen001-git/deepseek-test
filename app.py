@@ -3,7 +3,7 @@ import re
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
 from deepseek_client import generate_stream
 from database import init_db
-from search_client import search_bilibili, search_youtube, search_weixin_video, fetch_video_from_url, fetch_video_content
+from search_client import search_bilibili, search_youtube, search_weixin_video, search_xiaohongshu, search_douyin, fetch_video_from_url, fetch_video_content
 from hot_trends_client import fetch_hot, bust_cache, PLATFORMS as HOT_PLATFORMS
 from database import get_user_by_id, get_user_devices
 from auth import auth_bp
@@ -55,7 +55,8 @@ def stream_response(system_prompt, user_prompt, model):
             yield from generate_stream(system_prompt, user_prompt, model or None)
         except Exception as e:
             yield f"\n\n[生成出错：{e}]"
-    return Response(stream_with_context(generate()), content_type="text/plain; charset=utf-8")
+    return Response(stream_with_context(generate()), content_type="text/plain; charset=utf-8",
+                    headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"})
 
 
 @app.route("/")
@@ -221,16 +222,21 @@ def api_search_viral():
     bili_results, bili_error = search_bilibili(topic)
     yt_results,   yt_error   = search_youtube(topic)
     wx_results,   wx_error   = search_weixin_video(topic)
-    # 交叉排名：B站, YT, 视频号 循环交叉
+    xhs_results,  xhs_error  = search_xiaohongshu(topic)
+    dy_results,   dy_error   = search_douyin(topic)
+    # 交叉排名：B站, YT, 视频号, 小红书, 抖音 循环交叉
     results = []
-    for i in range(max(len(bili_results), len(yt_results), len(wx_results))):
-        if i < len(bili_results): results.append(bili_results[i])
-        if i < len(yt_results):   results.append(yt_results[i])
-        if i < len(wx_results):   results.append(wx_results[i])
-    error = None if results else (bili_error or yt_error or wx_error or "未找到相关视频")
+    for i in range(max(len(bili_results), len(yt_results), len(wx_results), len(xhs_results), len(dy_results))):
+        if i < len(bili_results):  results.append(bili_results[i])
+        if i < len(yt_results):    results.append(yt_results[i])
+        if i < len(wx_results):    results.append(wx_results[i])
+        if i < len(xhs_results):   results.append(xhs_results[i])
+        if i < len(dy_results):    results.append(dy_results[i])
+    other = yt_results or wx_results or xhs_results or dy_results
+    error = None if results else (bili_error or yt_error or wx_error or xhs_error or dy_error or "未找到相关视频")
     warnings = []
-    if bili_error and (yt_results or wx_results): warnings.append(f"B站：{bili_error}")
-    if wx_error  and (bili_results or yt_results): warnings.append(f"视频号：{wx_error}")
+    if bili_error and other: warnings.append(f"B站：{bili_error}")
+    if wx_error  and (bili_results or yt_results or xhs_results): warnings.append(f"视频号：{wx_error}")
     warning = "；".join(warnings) if warnings else None
     return jsonify({"results": results, "error": error, "warning": warning})
 

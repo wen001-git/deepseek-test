@@ -203,6 +203,7 @@
 
     /* spinner */
     .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes dotBounce { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-6px);opacity:1} }
 
     /* 分镜拍摄表 */
     #shot-table-content table { border-collapse: collapse; min-width: 700px; width: 100%; }
@@ -1284,6 +1285,7 @@
   // ── 结果存储（每个模块 × 每个模型）────────────────────────────────────────
   const PANELS = ['positioning','viral','monetize','script','rewrite','breakdown','imitate','director','content-plan','hottrends','profile'];
   const resultStore = {};
+  let _stopGeneration = null;  // abort function for current stream, null when idle
   PANELS.forEach(p => resultStore[p] = { 'deepseek-chat': null, 'deepseek-reasoner': null });
 
   let _positioningResult = '';
@@ -1345,6 +1347,17 @@
 
   // ── 流式提交 ─────────────────────────────────────────────────────────────
   // submitProgrammatic: called without a click event (e.g. from bdSelectResult)
+  function streamingPlaceholderHTML() {
+    return `<div style="padding:20px 0;display:flex;align-items:center;gap:10px;color:#aaa;font-size:14px">
+      <span style="display:inline-flex;gap:5px">
+        <span style="width:7px;height:7px;border-radius:50%;background:#a5b4fc;animation:dotBounce 1.2s ease-in-out infinite"></span>
+        <span style="width:7px;height:7px;border-radius:50%;background:#a5b4fc;animation:dotBounce 1.2s ease-in-out 0.2s infinite"></span>
+        <span style="width:7px;height:7px;border-radius:50%;background:#a5b4fc;animation:dotBounce 1.2s ease-in-out 0.4s infinite"></span>
+      </span>
+      正在生成，请稍候...
+    </div>`;
+  }
+
   function thinkingBarHTML() {
     return `<div class="thinking-progress">
       <span class="tp-emoji">✨</span>
@@ -1361,19 +1374,30 @@
   async function submit(name, model, clickedBtn) {
     // Support both direct call (clickedBtn passed) and onclick call (read from event)
     if (clickedBtn === undefined) clickedBtn = event.currentTarget;
-    const origText = clickedBtn ? clickedBtn.textContent : '';
 
-    // 禁用该模块所有生成按钮，防止重复提交
+    // Re-click during generation = stop
+    if (_stopGeneration) { _stopGeneration(); return; }
+
+    const origHTML = clickedBtn ? clickedBtn.innerHTML : '';
     const allBtns = document.querySelectorAll(`#panel-${name} .btn-primary, #panel-${name} .btn-secondary`);
     const resultCard = document.getElementById('result-' + name);
     const contentEl  = document.getElementById('content-' + name);
-
     const isReasoner = model === 'deepseek-reasoner';
-    allBtns.forEach(b => b.disabled = true);
-    if (clickedBtn) clickedBtn.innerHTML = isReasoner
-      ? '<span class="spinner"></span>深度思考中...'
-      : '<span class="spinner"></span>生成中...';
-    contentEl.innerHTML = isReasoner ? thinkingBarHTML() : '';
+
+    // Disable all buttons EXCEPT clicked one (it becomes the stop button)
+    allBtns.forEach(b => { if (b !== clickedBtn) b.disabled = true; });
+    if (clickedBtn) {
+      clickedBtn.style.background = '#ef4444';
+      clickedBtn.style.borderColor = '#ef4444';
+      clickedBtn.innerHTML = isReasoner
+        ? '<span class="spinner"></span>深度思考中... &nbsp;⏹ 停止'
+        : '<span class="spinner"></span>生成中... &nbsp;⏹ 停止';
+    }
+
+    const controller = new AbortController();
+    _stopGeneration = () => controller.abort();
+
+    contentEl.innerHTML = isReasoner ? thinkingBarHTML() : streamingPlaceholderHTML();
     resultCard.classList.add('show');
     setTimeout(() => resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     // 切换到当前模型的 tab
@@ -1390,6 +1414,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: controller.signal,
       });
 
       if (!res.ok) {
@@ -1399,6 +1424,8 @@
 
       // 流式读取 + markdown 渲染
       const reader = res.body.getReader();
+      // Now that we have the reader, upgrade _stopGeneration to also cancel it
+      _stopGeneration = () => { controller.abort(); reader.cancel(); };
       const decoder = new TextDecoder();
 
       let fullText = '';
@@ -1412,7 +1439,6 @@
         if (renderText.trim()) {
           if (!streaming) {
             streaming = true;
-            if (clickedBtn) clickedBtn.innerHTML = '<span class="spinner"></span>生成中...';
           }
           contentEl.innerHTML = marked.parse(renderText);
         }
@@ -1436,10 +1462,19 @@
       if (name === 'positioning') unlockStep2(fullText);
       if (name === 'viral') renderViralWithButtons(fullText, contentEl);
     } catch (e) {
-      alert('生成失败：' + e.message);
+      if (e.name !== 'AbortError') alert('生成失败：' + e.message);
+      // On abort: if nothing rendered yet, clear the placeholder/thinking bar
+      if (contentEl.querySelector('.thinking-progress, [style*="dotBounce"]')) {
+        contentEl.innerHTML = '<span style="color:#aaa;font-size:13px">已停止生成</span>';
+      }
     } finally {
+      _stopGeneration = null;
       allBtns.forEach(b => b.disabled = false);
-      if (clickedBtn) clickedBtn.textContent = origText;
+      if (clickedBtn) {
+        clickedBtn.style.background = '';
+        clickedBtn.style.borderColor = '';
+        clickedBtn.innerHTML = origHTML;
+      }
       if (name === 'breakdown') {
         document.getElementById('bd-analyzing-bar').style.display = 'none';
       }
@@ -1454,13 +1489,21 @@
     const platform = document.getElementById('cp-platform').value;
     if (!industry) { alert('请填写行业和领域'); return; }
     const clickedBtn = event.currentTarget;
+
+    if (_stopGeneration) { _stopGeneration(); return; }
+
     const allBtns = document.querySelectorAll('#wf-step2-wrapper .btn-primary, #wf-step2-wrapper .btn-secondary');
-    const origText = clickedBtn.textContent;
+    const origHTML = clickedBtn.innerHTML;
     const isReasoner = model === 'deepseek-reasoner';
-    allBtns.forEach(b => b.disabled = true);
+    allBtns.forEach(b => { if (b !== clickedBtn) b.disabled = true; });
+    clickedBtn.style.background = '#ef4444';
+    clickedBtn.style.borderColor = '#ef4444';
     clickedBtn.innerHTML = isReasoner
-      ? '<span class="spinner"></span>深度思考中...'
-      : '<span class="spinner"></span>生成中 0 字...';
+      ? '<span class="spinner"></span>深度思考中... &nbsp;⏹ 停止'
+      : '<span class="spinner"></span>生成中... &nbsp;⏹ 停止';
+
+    const controller = new AbortController();
+    _stopGeneration = () => controller.abort();
     document.getElementById('cp-result').style.display = 'none';
     const cpLoading = document.getElementById('cp-loading');
     cpLoading.innerHTML = isReasoner ? thinkingBarHTML() : '';
@@ -1478,6 +1521,7 @@
           target_audience: document.getElementById('cp-target-audience').value.trim(),
           model,
         }),
+        signal: controller.signal,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: '请求失败' }));
@@ -1518,11 +1562,14 @@
       const plan = JSON.parse(cleaned);
       renderContentPlan(plan);
     } catch (e) {
-      alert('规划失败：' + e.message);
+      if (e.name !== 'AbortError') alert('规划失败：' + e.message);
     } finally {
+      _stopGeneration = null;
       cpLoading.style.display = 'none';
       allBtns.forEach(b => b.disabled = false);
-      clickedBtn.textContent = origText;
+      clickedBtn.style.background = '';
+      clickedBtn.style.borderColor = '';
+      clickedBtn.innerHTML = origHTML;
     }
   }
 
@@ -1810,7 +1857,10 @@
     if (listEl) {
       listEl.innerHTML = data.map((item, i) => {
         const rank = i + 1;
-        const hot = item.hot ? formatHotVal(item.hot) : '';
+        const hotRaw = (item.hot != null && item.hot !== '') ? item.hot
+                     : (item.num != null && item.num !== '') ? item.num
+                     : null;
+        const hot = (hotRaw !== null && hotRaw > 0) ? formatHotVal(hotRaw) : '';
         const safeTitle = (item.title || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         const safeUrl = (item.url || '').replace(/"/g,'&quot;');
         const titleHtml = safeUrl
@@ -2176,11 +2226,14 @@
 
       const list = document.getElementById('bd-results-list');
       list.innerHTML = '';
-      const bCount = data.results.filter(r => r.platform === 'B站').length;
-      const yCount = data.results.filter(r => r.platform === 'YouTube').length;
+      const bCount   = data.results.filter(r => r.platform === 'B站').length;
+      const yCount   = data.results.filter(r => r.platform === 'YouTube').length;
+      const wxCount  = data.results.filter(r => r.platform === '视频号').length;
+      const xhsCount = data.results.filter(r => r.platform === '小红书').length;
       const metaParts = [];
-      if (bCount) metaParts.push(`${bCount} 条 B站视频`);
-      if (yCount) metaParts.push(`${yCount} 条 YouTube 视频`);
+      if (bCount)   metaParts.push(`${bCount} 条 B站视频`);
+      if (yCount)   metaParts.push(`${yCount} 条 YouTube 视频`);
+      if (wxCount)  metaParts.push(`${wxCount} 条 视频号`);
       document.getElementById('bd-results-meta').textContent =
         metaParts.join(' + ') + '，点击选择后自动开始分析';
 

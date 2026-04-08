@@ -440,7 +440,7 @@ def search_bilibili(topic: str) -> tuple:
             return [], "B站搜索暂时不可用，请稍后重试"
 
         results = []
-        for item in data.get("data", {}).get("result", [])[:5]:
+        for item in data.get("data", {}).get("result", [])[:10]:
             title  = _strip_html(item.get("title", "（无标题）"))
             bvid   = item.get("bvid", "")
             play   = _fmt_play(item.get("play", 0))
@@ -481,7 +481,7 @@ def search_youtube(topic: str) -> tuple:
             "part":             "snippet",
             "q":                topic,
             "type":             "video",
-            "maxResults":       6,
+            "maxResults":       10,
             "relevanceLanguage":"zh",
             "key":              api_key,
         }, timeout=10)
@@ -512,7 +512,7 @@ def search_youtube(topic: str) -> tuple:
         pass
 
     results = []
-    for item in items[:5]:
+    for item in items[:10]:
         vid  = item["id"]["videoId"]
         s    = item["snippet"]
         play = _fmt_play(stats.get(vid, {}).get("viewCount", ""))
@@ -530,6 +530,7 @@ def search_youtube(topic: str) -> tuple:
 # ── 微信视频号搜索（搜狗） ────────────────────────────────────────────────────
 
 SOGOU_WEIXIN_URL = 'https://weixin.sogou.com/weixin'
+SOGOU_WEB_URL    = 'https://www.sogou.com/web'
 SOGOU_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -663,7 +664,7 @@ def search_weixin_video(topic: str) -> tuple:
                 results.append({'title': title, 'url': href,
                                  'snippet': body[:120],
                                  'platform': '视频号', 'source': 'real'})
-                if len(results) >= 5:
+                if len(results) >= 8:
                     break
         if results:
             return results, None
@@ -671,6 +672,109 @@ def search_weixin_video(topic: str) -> tuple:
         pass
 
     return [], "未找到相关视频号内容，请换个关键词"
+
+
+# ── 小红书关键词搜索（DuckDuckGo） ───────────────────────────────────────────
+
+def search_xiaohongshu(topic: str) -> tuple:
+    """Search 小红书 content via Sogou web search (Strategy 1) + DuckDuckGo fallback (Strategy 2).
+    Returns (list[{title,url,snippet,platform,source}], error_str|None)"""
+    # Strategy 1: Sogou web search filtered for xiaohongshu.com results
+    try:
+        from lxml import html as lxml_html
+        resp = requests.get(
+            SOGOU_WEB_URL,
+            params={'query': f'{topic} 小红书', 'ie': 'utf8'},
+            headers=SOGOU_HEADERS,
+            timeout=10,
+        )
+        if resp.status_code == 200 and 'antispider' not in resp.url:
+            text = None
+            for enc in ('gb2312', 'gbk', 'utf-8'):
+                try:
+                    text = resp.content.decode(enc)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if text is None:
+                text = resp.content.decode('utf-8', errors='replace')
+            tree = lxml_html.fromstring(text)
+            results = []
+            for a in tree.xpath('//h3//a[@href]'):
+                href  = a.get('href', '')
+                title = _strip_html(a.text_content()).strip()
+                if not title or not href:
+                    continue
+                if href.startswith('/link?'):
+                    href = 'https://www.sogou.com' + href
+                if 'xiaohongshu.com' not in href and 'xhslink.com' not in href:
+                    continue
+                results.append({
+                    'title': title, 'url': href, 'snippet': '',
+                    'platform': '小红书', 'source': 'real',
+                })
+                if len(results) >= 8:
+                    break
+            if results:
+                return results, None
+    except Exception:
+        pass
+
+    # Strategy 2: DuckDuckGo with site filter
+    if _DDGS_AVAILABLE:
+        try:
+            results = []
+            with DDGS() as ddgs:
+                for r in ddgs.text(f'{topic} 小红书 site:xiaohongshu.com', max_results=10):
+                    href  = r.get('href', '')
+                    title = r.get('title', '').strip()
+                    body  = r.get('body', '')
+                    if not title or title.startswith('http'):
+                        continue
+                    results.append({'title': title, 'url': href,
+                                     'snippet': body[:120],
+                                     'platform': '小红书', 'source': 'real'})
+                    if len(results) >= 8:
+                        break
+            if results:
+                return results, None
+        except Exception:
+            pass
+
+    return [], None  # silently absent when unavailable
+
+
+# ── 抖音关键词搜索（DuckDuckGo） ─────────────────────────────────────────────
+
+def search_douyin(topic: str) -> tuple:
+    """Search Douyin hot list via DailyHotApi, filtered by keyword.
+    Falls back to top trending if no keyword match."""
+    try:
+        from hot_trends_client import fetch_hot, HOT_API_BASE
+        if not HOT_API_BASE:
+            return [], None  # silently skip if proxy not configured
+        data, ts, error = fetch_hot('douyin')
+        if not data:
+            return [], None
+        # Filter by keyword (any character sequence in topic found in title)
+        keywords = [w for w in topic.strip().split() if w]
+        matched = [i for i in data if any(k in i.get('title', '') for k in keywords)]
+        if not matched:
+            return [], None  # no relevant results, don't show unrelated trending
+        items = matched[:5]
+        results = [
+            {
+                'title': i.get('title', ''),
+                'url': i.get('url', ''),
+                'snippet': f"🔥 抖音热榜{'  热度 ' + str(i['hot']) if i.get('hot') else ''}",
+                'platform': '抖音',
+                'source': 'real',
+            }
+            for i in items if i.get('title')
+        ]
+        return results, None
+    except Exception:
+        return [], None
 
 
 # ── URL 解析 ──────────────────────────────────────────────────────────────────

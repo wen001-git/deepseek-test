@@ -10,21 +10,34 @@ CACHE_TTL = 1800  # 30 minutes
 _cache = {}  # {platform: {'data': [...], 'ts': float}}
 
 PLATFORMS = [
-    {'key': 'weibo',    'label': '微博热搜'},
-    {'key': 'bilibili', 'label': 'B站热榜'},
-    {'key': 'douyin',   'label': '抖音热点'},
-    {'key': 'baidu',    'label': '百度热搜'},
-    {'key': 'zhihu',    'label': '知乎热榜'},
-    {'key': 'toutiao',  'label': '今日头条'},
-    {'key': '36kr',     'label': '36氪'},
-    {'key': 'ithome',   'label': 'IT之家'},
-    {'key': 'juejin',   'label': '掘金'},
-    {'key': 'huxiu',    'label': '虎嗅'},
-    {'key': 'tieba',    'label': '百度贴吧'},
-    {'key': 'weread',   'label': '微信读书'},
-    {'key': 'github',   'label': 'GitHub'},
-    {'key': 'v2ex',     'label': 'V2EX'},
-    {'key': 'sspai',    'label': '少数派'},
+    {'key': 'weibo',        'label': '微博热搜'},
+    {'key': 'bilibili',     'label': 'B站热榜'},
+    {'key': 'douyin',       'label': '抖音热点'},
+    {'key': 'kuaishou',     'label': '快手热榜'},
+    {'key': 'baidu',        'label': '百度热搜'},
+    {'key': 'zhihu',        'label': '知乎热榜'},
+    {'key': 'toutiao',      'label': '今日头条'},
+    {'key': 'thepaper',     'label': '澎湃新闻'},
+    {'key': 'netease-news', 'label': '网易新闻'},
+    {'key': 'qq-news',      'label': '腾讯新闻'},
+    {'key': 'sina-news',    'label': '新浪新闻'},
+    {'key': 'hupu',         'label': '虎扑'},
+    {'key': 'douban-movie', 'label': '豆瓣电影'},
+    {'key': 'acfun',        'label': 'AcFun'},
+    {'key': '36kr',         'label': '36氪'},
+    {'key': 'ithome',       'label': 'IT之家'},
+    {'key': 'juejin',       'label': '掘金'},
+    {'key': 'csdn',         'label': 'CSDN'},
+    {'key': 'huxiu',        'label': '虎嗅'},
+    {'key': 'tieba',        'label': '百度贴吧'},
+    {'key': 'weread',       'label': '微信读书'},
+    {'key': 'github',       'label': 'GitHub'},
+    {'key': 'hackernews',   'label': 'Hacker News'},
+    {'key': 'producthunt',  'label': 'Product Hunt'},
+    {'key': 'v2ex',         'label': 'V2EX'},
+    {'key': 'sspai',        'label': '少数派'},
+    {'key': 'linuxdo',      'label': 'Linux.do'},
+    {'key': 'ngabbs',       'label': 'NGA'},
 ]
 
 _UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
@@ -128,15 +141,36 @@ def fetch_hot(platform: str):
         return cached['data'], cached['ts'], None
 
     try:
-        if HOT_API_BASE:
-            # Option B: proxy via DailyHotApi on Vercel
-            resp = requests.get(f'{HOT_API_BASE}/{platform}', timeout=10)
-            resp.raise_for_status()
-            data = resp.json().get('data', [])[:30]
-        else:
-            # Plan B fallback: call platform APIs directly
+        data = None
+        api_error = None
+
+        # Weibo: direct fetcher returns hot values (num field); proxy omits them.
+        # Try direct first, fall through to proxy if it fails.
+        if platform == 'weibo':
+            try:
+                data = _fetch_weibo()
+                if not data:
+                    data = None
+            except Exception:
+                data = None
+
+        if data is None and HOT_API_BASE:
+            # Proxy via DailyHotApi on Render/Vercel
+            try:
+                resp = requests.get(f'{HOT_API_BASE}/{platform}', timeout=20)
+                resp.raise_for_status()
+                data = resp.json().get('data', [])[:30]
+            except Exception as e:
+                # Render free tier cold-start timeout — fall through
+                api_error = str(e)
+                data = None
+
+        if data is None:
+            # Direct fetchers fallback
             fetcher = _DIRECT_FETCHERS.get(platform)
             if not fetcher:
+                if HOT_API_BASE and api_error:
+                    return [], None, f'获取失败，请稍候重试（服务冷启动中）'
                 return [], None, '该平台热榜需配置 HOT_API_BASE_URL 才能使用'
             data = fetcher()
 
