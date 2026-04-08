@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, render_template, Response, stream_wit
 from deepseek_client import generate_stream
 from database import init_db
 from search_client import search_bilibili, search_youtube, search_weixin_video, fetch_video_from_url, fetch_video_content
+from hot_trends_client import fetch_hot, bust_cache, PLATFORMS as HOT_PLATFORMS
 from database import get_user_by_id, get_user_devices
 from auth import auth_bp
 from admin import admin_bp
@@ -292,6 +293,20 @@ def api_content_plan():
         data.get("target_audience", ""),
     )
     return stream_response(CONTENT_PLAN_SYSTEM_PROMPT, prompt, data.get("model"))
+
+
+# ─── 热点追踪 ────────────────────────────────────────────────────────────────
+
+@app.route("/api/hot-trends")
+def api_hot_trends():
+    if session.get('role') != 'admin':
+        return jsonify({"error": "无权限"}), 403
+    platform = request.args.get("platform", "weibo")
+    force = request.args.get("force") == "1"
+    if force:
+        bust_cache(platform)
+    data, ts, error = fetch_hot(platform)
+    return jsonify({"data": data, "ts": ts, "error": error, "platforms": HOT_PLATFORMS})
 
 
 if __name__ == "__main__":
