@@ -1,6 +1,9 @@
 import sqlite3
 import os
+from datetime import date
 from werkzeug.security import generate_password_hash
+
+DAILY_LIMITS = {'free': 3, 'pro': 30, 'pro_plus': 90, 'admin': 999999}
 
 DB_PATH = os.getenv('DB_PATH', os.path.join(os.path.dirname(__file__), 'users.db'))
 
@@ -37,6 +40,11 @@ def init_db():
     for col, definition in [
         ("plain_password", "TEXT DEFAULT ''"),
         ("expires_at", "TEXT DEFAULT NULL"),
+        ("daily_usage_count", "INTEGER DEFAULT 0"),
+        ("daily_usage_date", "TEXT DEFAULT NULL"),
+        ("subscription_tier", "TEXT DEFAULT 'free'"),
+        ("google_play_token", "TEXT DEFAULT NULL"),
+        ("subscription_product_id", "TEXT DEFAULT NULL"),
     ]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -154,6 +162,45 @@ def check_and_register_device(user_id, ip, fingerprint, role='user'):
     conn.commit()
     conn.close()
     return True, 'ok'
+
+
+def check_and_increment_quota(user_id, role):
+    """Check daily usage limit and increment counter. Returns (allowed, error_message)."""
+    if role == 'admin':
+        return True, None
+    today = date.today().isoformat()
+    conn = get_db()
+    user = conn.execute(
+        "SELECT daily_usage_count, daily_usage_date, subscription_tier FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+    if not user:
+        conn.close()
+        return False, '用户不存在'
+    tier = user['subscription_tier'] or 'free'
+    count = user['daily_usage_count'] if user['daily_usage_date'] == today else 0
+    limit = DAILY_LIMITS.get(tier, 3)
+    if count >= limit:
+        conn.close()
+        tier_name = {'free': '免费版', 'pro': 'Pro版', 'pro_plus': 'Pro+版'}.get(tier, tier)
+        return False, f'今日{tier_name}使用次数已达上限（{limit}次），请明日再试或升级套餐'
+    conn.execute(
+        "UPDATE users SET daily_usage_count = ?, daily_usage_date = ? WHERE id = ?",
+        (count + 1, today, user_id)
+    )
+    conn.commit()
+    conn.close()
+    return True, None
+
+
+def update_user_subscription(user_id, tier, purchase_token, product_id, expires_at):
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET subscription_tier=?, google_play_token=?, subscription_product_id=?, expires_at=? WHERE id=?",
+        (tier, purchase_token, product_id, expires_at, user_id)
+    )
+    conn.commit()
+    conn.close()
 
 
 def update_user_password(user_id, new_password):

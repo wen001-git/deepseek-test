@@ -5,9 +5,10 @@ from deepseek_client import generate_stream
 from database import init_db
 from search_client import search_bilibili, search_youtube, search_weixin_video, search_xiaohongshu, search_douyin, fetch_video_from_url, fetch_video_content
 from hot_trends_client import fetch_hot, bust_cache, PLATFORMS as HOT_PLATFORMS
-from database import get_user_by_id, get_user_devices
+from database import get_user_by_id, get_user_devices, check_and_increment_quota
 from auth import auth_bp
 from admin import admin_bp
+from mobile_api import mobile_bp
 from prompts import (
     SCRIPT_SYSTEM_PROMPT, VIDEO_TYPES, STYLES, build_script_prompt,
     POSITIONING_SYSTEM_PROMPT, INDUSTRIES, RESOURCES, PLATFORMS,
@@ -27,13 +28,31 @@ app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-change-in-production')
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(mobile_bp)
 
 init_db()
 
 @app.before_request
 def require_login():
+    # Mobile JWT injection: set session values from Bearer token so all
+    # existing /api/* route handlers work unchanged for mobile clients.
+    auth = request.headers.get('Authorization', '')
+    if auth.startswith('Bearer ') and request.path.startswith('/api/'):
+        try:
+            from mobile_auth import decode_mobile_token
+            from datetime import date as _date
+            payload = decode_mobile_token(auth[7:])
+            user = get_user_by_id(payload['user_id'])
+            if user and user['is_active']:
+                if not user['expires_at'] or _date.today().isoformat() <= user['expires_at']:
+                    session['user_id'] = user['id']
+                    session['username'] = user['username']
+                    session['role'] = user['role']
+        except Exception:
+            pass
+
     public_paths = {'/login', '/ping'}
-    if request.path in public_paths or request.path.startswith('/static'):
+    if request.path in public_paths or request.path.startswith('/static') or request.path.startswith('/api/mobile'):
         return
     if not session.get('user_id'):
         return redirect('/login')
@@ -45,7 +64,13 @@ def ping():
 
 
 def stream_response(system_prompt, user_prompt, model):
-    is_admin = session.get('role') == 'admin'
+    user_id = session.get('user_id')
+    role = session.get('role', 'user')
+    allowed, quota_error = check_and_increment_quota(user_id, role)
+    if not allowed:
+        return jsonify({'error': quota_error}), 429
+
+    is_admin = role == 'admin'
     def generate():
         if is_admin:
             import json as _json
