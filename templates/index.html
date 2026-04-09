@@ -223,6 +223,7 @@
     .hot-item-link { cursor:pointer; text-decoration:none; color:#1a1a2e; }
     .hot-item-link:hover { color:#6366f1; text-decoration:underline; }
     .hot-val { font-size:11px; color:#f97316; white-space:nowrap; flex-shrink:0; }
+    .hot-author { font-size:11px; color:#94a3b8; white-space:nowrap; flex-shrink:0; max-width:100px; overflow:hidden; text-overflow:ellipsis; }
     .hot-actions { display:flex; gap:4px; flex-shrink:0; }
     .hot-actions button { font-size:11px; padding:3px 7px; border-radius:6px; border:1px solid #e5e7eb; background:#fafafa; cursor:pointer; font-family:inherit; white-space:nowrap; color:#555; }
     .hot-actions button:hover { background:#6366f1; color:#fff; border-color:#6366f1; }
@@ -1040,7 +1041,8 @@
           <button onclick="loadHotTrends(currentHotPlatform, true)"
             style="font-size:12px;padding:5px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;color:#666;white-space:nowrap;flex-shrink:0">⟳ 刷新</button>
         </div>
-        <div id="hot-status" style="font-size:12px;color:#aaa;margin-bottom:10px;min-height:16px"></div>
+        <div id="hot-status" style="font-size:12px;color:#aaa;margin-bottom:4px;min-height:16px"></div>
+        <div id="hot-platform-tip" style="font-size:12px;color:#94a3b8;margin-bottom:10px;min-height:16px"></div>
         <div id="hot-list"><span style="color:#bbb;font-size:13px">切换到此页面时自动加载...</span></div>
       </div>
     </div>{% endif %}
@@ -1798,6 +1800,9 @@
   }
 
   // ── 热点追踪 ──────────────────────────────────────────────────────────────
+  const PLATFORM_TIPS = {
+    'youtube-trending': '💡 排名按 YouTube 官方热门算法（综合播放增速、互动等），并非单纯播放量高低',
+  };
   let currentHotPlatform = 'weibo';
   let hotPlatforms = [];
   let hotInited = false;
@@ -1842,7 +1847,9 @@
 
   function renderHotList({ data, ts, error }) {
     const statusEl = document.getElementById('hot-status');
+    const tipEl = document.getElementById('hot-platform-tip');
     const listEl = document.getElementById('hot-list');
+    if (tipEl) tipEl.textContent = PLATFORM_TIPS[currentHotPlatform] || '';
     if (statusEl) {
       if (ts) {
         const mins = Math.round((Date.now() / 1000 - ts) / 60);
@@ -1861,6 +1868,10 @@
                      : (item.num != null && item.num !== '') ? item.num
                      : null;
         const hot = (hotRaw !== null && hotRaw > 0) ? formatHotVal(hotRaw) : '';
+        const author = (item.author || '').trim();
+        const meta = hot
+          ? `<span class="hot-val">🔥 ${hot}</span>`
+          : author ? `<span class="hot-author">${author}</span>` : '';
         const safeTitle = (item.title || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         const safeUrl = (item.url || '').replace(/"/g,'&quot;');
         const titleHtml = safeUrl
@@ -1869,7 +1880,7 @@
         return `<div class="hot-item">
           <div class="hot-rank${rank <= 3 ? ' top3' : ''}">${rank}</div>
           ${titleHtml}
-          ${hot ? `<span class="hot-val">🔥 ${hot}</span>` : ''}
+          ${meta}
           <div class="hot-actions">
             <button class="hot-btn-topic" data-title="${safeTitle}">用于选题</button>
             <button class="hot-btn-breakdown" data-title="${safeTitle}">拆解分析</button>

@@ -32,6 +32,7 @@ PLATFORMS = [
     {'key': 'tieba',        'label': '百度贴吧'},
     {'key': 'weread',       'label': '微信读书'},
     {'key': 'github',       'label': 'GitHub'},
+    {'key': 'youtube-trending', 'label': 'YouTube 热榜'},
     {'key': 'hackernews',   'label': 'Hacker News'},
     {'key': 'producthunt',  'label': 'Product Hunt'},
     {'key': 'v2ex',         'label': 'V2EX'},
@@ -123,12 +124,42 @@ def _fetch_douyin():
     return []
 
 
+def _fetch_youtube_trending():
+    api_key = os.getenv('YOUTUBE_API_KEY', '')
+    if not api_key:
+        return []
+    r = requests.get(
+        'https://www.googleapis.com/youtube/v3/videos',
+        params={
+            'part': 'snippet,statistics',
+            'chart': 'mostPopular',
+            'regionCode': 'US',
+            'maxResults': 30,
+            'key': api_key,
+        },
+        timeout=15,
+    )
+    r.raise_for_status()
+    items = r.json().get('items', [])
+    results = [
+        {
+            'title': i['snippet']['title'],
+            'hot': int(i['statistics'].get('viewCount', 0)),
+            'author': i['snippet'].get('channelTitle', ''),
+            'url': f'https://www.youtube.com/watch?v={i["id"]}',
+        }
+        for i in items if i.get('snippet', {}).get('title')
+    ]
+    return results[:30]
+
+
 _DIRECT_FETCHERS = {
-    'weibo':    _fetch_weibo,
-    'bilibili': _fetch_bilibili,
-    'zhihu':    _fetch_zhihu,
-    'baidu':    _fetch_baidu,
-    'douyin':   _fetch_douyin,
+    'weibo':             _fetch_weibo,
+    'bilibili':          _fetch_bilibili,
+    'zhihu':             _fetch_zhihu,
+    'baidu':             _fetch_baidu,
+    'douyin':            _fetch_douyin,
+    'youtube-trending':  _fetch_youtube_trending,
 }
 
 # ── Public interface ──────────────────────────────────────────────────────────
@@ -144,11 +175,11 @@ def fetch_hot(platform: str):
         data = None
         api_error = None
 
-        # Weibo: direct fetcher returns hot values (num field); proxy omits them.
-        # Try direct first, fall through to proxy if it fails.
-        if platform == 'weibo':
+        # Platforms with direct fetchers that are richer or not in DailyHotApi:
+        # try direct first, fall through to proxy if it fails.
+        if platform in ('weibo', 'youtube-trending'):
             try:
-                data = _fetch_weibo()
+                data = _DIRECT_FETCHERS[platform]()
                 if not data:
                     data = None
             except Exception:
