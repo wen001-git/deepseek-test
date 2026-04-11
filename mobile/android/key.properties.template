@@ -1,0 +1,15 @@
+# Release signing template — copy this file to android/key.properties and fill in real values.
+# key.properties is gitignored and must NEVER be committed to version control.
+#
+# Step 1 — Generate a keystore (run once, keep the .jks file safe):
+#   keytool -genkey -v -keystore android/app/keystore.jks \
+#           -alias upload -keyalg RSA -keysize 2048 -validity 10000
+#
+# Step 2 — Copy this file:
+#   cp android/key.properties.template android/key.properties
+#
+# Step 3 — Fill in the values below:
+storeFile=../app/keystore.jks
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyAlias=YOUR_KEY_ALIAS
+keyPassword=YOUR_KEY_PASSWORD

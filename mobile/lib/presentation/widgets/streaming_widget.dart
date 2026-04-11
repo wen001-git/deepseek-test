@@ -1,0 +1,380 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+/// Consumes a Stream<String> of text chunks from Flask and renders them
+/// as Markdown in real time.
+///
+/// [streamBuilder] receives the selected model string ('deepseek-chat' or
+/// 'deepseek-reasoner') so callers can include it in the request body.
+///
+/// [isAdmin] enables the collapsible Prompt Debug panel which parses and
+/// strips the [DEBUG:{json}:DEBUG] prefix the server injects for admins.
+class StreamingWidget extends StatefulWidget {
+  final Stream<String> Function(String model) streamBuilder;
+  final String title;
+  final bool isAdmin;
+  final void Function(String text)? onComplete;
+  /// Called on every chunk during streaming with the current accumulated
+  /// character count. Called with 0 when streaming ends or errors.
+  final void Function(int charCount)? onProgress;
+
+  const StreamingWidget({
+    super.key,
+    required this.streamBuilder,
+    required this.title,
+    this.isAdmin = false,
+    this.onComplete,
+    this.onProgress,
+  });
+
+  @override
+  State<StreamingWidget> createState() => StreamingWidgetState();
+}
+
+class StreamingWidgetState extends State<StreamingWidget> {
+  String _model = 'deepseek-chat';
+  final StringBuffer _buffer = StringBuffer();
+  String _text = '';
+  bool _loading = false;
+  bool _firstTokenReceived = false;
+  String? _error;
+  _DebugData? _debug;
+
+  // Progressive status messages while waiting for the first token
+  static const _waitingMessages = [
+    '正在连接 AI…',
+    'AI 思考中，请稍候…',
+    '即将开始输出，请耐心等待…',
+  ];
+  int _waitingMsgIndex = 0;
+  Timer? _waitingTimer;
+
+  void _startWaitingMessages() {
+    _waitingMsgIndex = 0;
+    _waitingTimer?.cancel();
+    _waitingTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || _firstTokenReceived) {
+        _waitingTimer?.cancel();
+        return;
+      }
+      setState(() {
+        _waitingMsgIndex =
+            (_waitingMsgIndex + 1).clamp(0, _waitingMessages.length - 1);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _waitingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    _buffer.clear();
+    _debug = null;
+    _waitingTimer?.cancel();
+    setState(() {
+      _text = '';
+      _loading = true;
+      _firstTokenReceived = false;
+      _error = null;
+      _waitingMsgIndex = 0;
+    });
+    _startWaitingMessages();
+
+    // Non-admin users never receive the [DEBUG:...:DEBUG] prefix, so skip
+    // accumulation entirely — write every chunk straight to the buffer so
+    // text appears character-by-character without any delay.
+    // Admin users still need accumulation to detect the optional prefix.
+    String accumulator = '';
+    bool debugParsed = !widget.isAdmin;
+
+    try {
+      await for (final chunk in widget.streamBuilder(_model)) {
+        if (!debugParsed) {
+          accumulator += chunk;
+          final match =
+              RegExp(r'^\[DEBUG:([\s\S]*?):DEBUG\]\n').firstMatch(accumulator);
+          if (match != null) {
+            try {
+              final decoded = jsonDecode(match.group(1)!) as Map<String, dynamic>;
+              _debug = _DebugData(
+                sys: decoded['sys'] as String? ?? '',
+                usr: decoded['usr'] as String? ?? '',
+              );
+            } catch (_) {}
+            // Strip the debug marker, keep remainder
+            accumulator = accumulator.substring(match.end);
+            _buffer.write(accumulator);
+            debugParsed = true;
+          } else if (!accumulator.startsWith('[') || accumulator.length > 4000) {
+            // Clearly not a debug marker — flush accumulator
+            _buffer.write(accumulator);
+            debugParsed = true;
+          }
+          // else: still accumulating to find complete marker
+        } else {
+          _buffer.write(chunk);
+        }
+
+        final newText = _buffer.toString();
+        if (newText.isNotEmpty && !_firstTokenReceived) {
+          _waitingTimer?.cancel();
+          setState(() {
+            _firstTokenReceived = true;
+            _text = newText;
+          });
+        } else {
+          setState(() => _text = newText);
+        }
+        widget.onProgress?.call(_text.length);
+      }
+      setState(() => _loading = false);
+      widget.onProgress?.call(0); // signal streaming done
+      if (_text.isNotEmpty) widget.onComplete?.call(_text);
+    } catch (e) {
+      _waitingTimer?.cancel();
+      widget.onProgress?.call(0);
+      setState(() {
+        _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: _text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+          content: Text('已复制到剪贴板'), duration: Duration(seconds: 2)),
+    );
+  }
+
+  void _share() => Share.share(_text, subject: widget.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Model selector ───────────────────────────────────────────────────
+        SegmentedButton<String>(
+          style: SegmentedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          segments: const [
+            ButtonSegment(
+              value: 'deepseek-chat',
+              icon: Icon(Icons.bolt, size: 14),
+              label: Text('快速生成', style: TextStyle(fontSize: 12)),
+            ),
+            ButtonSegment(
+              value: 'deepseek-reasoner',
+              icon: Icon(Icons.psychology_outlined, size: 14),
+              label: Text('深度思考', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+          selected: {_model},
+          onSelectionChanged:
+              _loading ? null : (s) => setState(() => _model = s.first),
+        ),
+        const SizedBox(height: 12),
+
+        // ── Prompt Debug (admin only) ─────────────────────────────────────
+        if (widget.isAdmin && _debug != null) ...[
+          _PromptDebugPanel(debug: _debug!),
+          const SizedBox(height: 8),
+        ],
+
+        // ── Error ────────────────────────────────────────────────────────
+        if (_error != null)
+          Card(
+            color: Theme.of(context).colorScheme.errorContainer,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(_error!,
+                  style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer)),
+            ),
+          ),
+
+        // ── Output ───────────────────────────────────────────────────────
+        if (_text.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: _copy,
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('复制'),
+              ),
+              TextButton.icon(
+                onPressed: _share,
+                icon: const Icon(Icons.share, size: 16),
+                label: const Text('分享'),
+              ),
+            ],
+          ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              // During streaming: plain selectable text for immediate word-by-word
+              // display with no Markdown parsing overhead.
+              // After complete: render as Markdown for proper formatting.
+              child: _loading
+                  ? SelectableText(
+                      _text,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    )
+                  : MarkdownBody(
+                      data: _text,
+                      onTapLink: (_, href, __) async {
+                        if (href != null) launchUrl(Uri.parse(href));
+                      },
+                    ),
+            ),
+          ),
+        ],
+
+        // ── Loading ──────────────────────────────────────────────────────
+        if (_loading)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 8),
+              Text(
+                _firstTokenReceived
+                    ? (_model == 'deepseek-reasoner'
+                        ? '深度思考中，通常需要 20-40 秒…'
+                        : '生成中…')
+                    : (_model == 'deepseek-reasoner'
+                        ? '深度思考中，通常需要 20-40 秒…'
+                        : _waitingMessages[_waitingMsgIndex]),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+            ]),
+          ),
+
+        const SizedBox(height: 80), // space for FAB
+      ],
+    );
+  }
+
+  /// Called by the parent FAB to trigger generation.
+  void start() => _start();
+}
+
+// ── Internal data ─────────────────────────────────────────────────────────────
+
+class _DebugData {
+  final String sys;
+  final String usr;
+  const _DebugData({required this.sys, required this.usr});
+}
+
+// ── Prompt Debug Panel ───────────────────────────────────────────────────────
+
+class _PromptDebugPanel extends StatefulWidget {
+  final _DebugData debug;
+  const _PromptDebugPanel({required this.debug});
+
+  @override
+  State<_PromptDebugPanel> createState() => _PromptDebugPanelState();
+}
+
+class _PromptDebugPanelState extends State<_PromptDebugPanel> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Material(
+        color: const Color(0xFF1a1a2e),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6366f1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('ADMIN',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Prompt Debug',
+                      style: TextStyle(color: Colors.white, fontSize: 13)),
+                  const Spacer(),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                ]),
+              ),
+            ),
+            if (_expanded) ...[
+              const Divider(color: Colors.white12, height: 1),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _debugSection('SYSTEM PROMPT', widget.debug.sys),
+                      const SizedBox(height: 12),
+                      _debugSection('USER PROMPT', widget.debug.usr),
+                    ]),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _debugSection(String label, String text) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: const TextStyle(
+              color: Color(0xFF6366f1),
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8)),
+      const SizedBox(height: 4),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: SelectableText(
+          text,
+          style: const TextStyle(
+              color: Colors.white70, fontSize: 11, fontFamily: 'monospace'),
+        ),
+      ),
+    ]);
+  }
+}
