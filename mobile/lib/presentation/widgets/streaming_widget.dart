@@ -39,7 +39,9 @@ class StreamingWidget extends StatefulWidget {
 class StreamingWidgetState extends State<StreamingWidget> {
   String _model = 'deepseek-chat';
   final StringBuffer _buffer = StringBuffer();
-  String _text = '';
+  String _text = '';           // full received text
+  String _displayText = '';    // typewriter cursor position
+  int _displayPos = 0;
   bool _loading = false;
   bool _firstTokenReceived = false;
   String? _error;
@@ -53,6 +55,10 @@ class StreamingWidgetState extends State<StreamingWidget> {
   ];
   int _waitingMsgIndex = 0;
   Timer? _waitingTimer;
+
+  // Typewriter timer: reveals _text into _displayText at a controlled pace
+  // so text always appears to "type out" smoothly regardless of chunk timing.
+  Timer? _typeTimer;
 
   void _startWaitingMessages() {
     _waitingMsgIndex = 0;
@@ -69,9 +75,35 @@ class StreamingWidgetState extends State<StreamingWidget> {
     });
   }
 
+  /// Start the typewriter timer.
+  /// Each tick (16 ms ≈ 60 fps) advances [_displayPos] toward [_text.length].
+  /// Speed is adaptive: the further behind, the faster we catch up.
+  void _startTypeTimer() {
+    _typeTimer?.cancel();
+    _typeTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!mounted) {
+        _typeTimer?.cancel();
+        return;
+      }
+      final target = _text.length;
+      if (_displayPos >= target) {
+        if (!_loading) _typeTimer?.cancel();
+        return;
+      }
+      // Adaptive speed: catch up faster when more text is buffered.
+      final buffered = target - _displayPos;
+      final step = buffered > 500 ? 50 : buffered > 100 ? 20 : 8;
+      setState(() {
+        _displayPos = (_displayPos + step).clamp(0, target);
+        _displayText = _text.substring(0, _displayPos);
+      });
+    });
+  }
+
   @override
   void dispose() {
     _waitingTimer?.cancel();
+    _typeTimer?.cancel();
     super.dispose();
   }
 
@@ -79,8 +111,11 @@ class StreamingWidgetState extends State<StreamingWidget> {
     _buffer.clear();
     _debug = null;
     _waitingTimer?.cancel();
+    _typeTimer?.cancel();
     setState(() {
       _text = '';
+      _displayText = '';
+      _displayPos = 0;
       _loading = true;
       _firstTokenReceived = false;
       _error = null;
@@ -123,23 +158,34 @@ class StreamingWidgetState extends State<StreamingWidget> {
           _buffer.write(chunk);
         }
 
-        final newText = _buffer.toString();
-        if (newText.isNotEmpty && !_firstTokenReceived) {
+        // Update the full received text without calling setState —
+        // the typewriter timer handles all visual updates at 60 fps.
+        _text = _buffer.toString();
+
+        if (_text.isNotEmpty && !_firstTokenReceived) {
           _waitingTimer?.cancel();
-          setState(() {
-            _firstTokenReceived = true;
-            _text = newText;
-          });
-        } else {
-          setState(() => _text = newText);
+          _firstTokenReceived = true;
+          _startTypeTimer();
+          // Single setState to show the text card and cancel waiting UI.
+          setState(() {});
         }
+
+        // Notify parent of progress (triggers FAB char-count update).
         widget.onProgress?.call(_text.length);
       }
-      setState(() => _loading = false);
+
+      // Streaming complete: immediately reveal full text and switch to Markdown.
+      _typeTimer?.cancel();
+      setState(() {
+        _loading = false;
+        _displayText = _text;
+        _displayPos = _text.length;
+      });
       widget.onProgress?.call(0); // signal streaming done
       if (_text.isNotEmpty) widget.onComplete?.call(_text);
     } catch (e) {
       _waitingTimer?.cancel();
+      _typeTimer?.cancel();
       widget.onProgress?.call(0);
       setState(() {
         _loading = false;
@@ -206,7 +252,7 @@ class StreamingWidgetState extends State<StreamingWidget> {
           ),
 
         // ── Output ───────────────────────────────────────────────────────
-        if (_text.isNotEmpty) ...[
+        if (_displayText.isNotEmpty) ...[
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -230,7 +276,7 @@ class StreamingWidgetState extends State<StreamingWidget> {
               // After complete: render as Markdown for proper formatting.
               child: _loading
                   ? SelectableText(
-                      _text,
+                      _displayText,
                       style: Theme.of(context).textTheme.bodyMedium,
                     )
                   : MarkdownBody(

@@ -15,7 +15,8 @@ import '../widgets/content_plan_view.dart';
 // ── 1. 脚本制作 ────────────────────────────────────────────────────────────────
 
 class ScriptScreen extends ConsumerStatefulWidget {
-  const ScriptScreen({super.key});
+  final String? initialTopic;
+  const ScriptScreen({super.key, this.initialTopic});
   @override
   ConsumerState<ScriptScreen> createState() => _ScriptScreenState();
 }
@@ -27,6 +28,45 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
   String _style = '幽默';
   int _duration = 60;
   String _scriptResult = '';
+  Map<String, dynamic>? _savedInput;
+
+  static const _historyKey = 'script_last';
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill topic when navigated from a content plan "制作脚本" button
+    if (widget.initialTopic != null && widget.initialTopic!.isNotEmpty) {
+      _topicCtrl.text = widget.initialTopic!;
+    }
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final raw = await ref.read(localDataSourceProvider).getString(_historyKey);
+    if (raw != null && mounted) {
+      setState(() => _savedInput = jsonDecode(raw) as Map<String, dynamic>);
+    }
+  }
+
+  void _saveHistory() {
+    ref.read(localDataSourceProvider).saveString(_historyKey, jsonEncode({
+      'topic': _topicCtrl.text.trim(),
+      'type': _type,
+      'style': _style,
+      'duration': _duration,
+    }));
+  }
+
+  void _restoreInput() {
+    if (_savedInput == null) return;
+    setState(() {
+      _topicCtrl.text = _savedInput!['topic'] as String? ?? '';
+      _type = _savedInput!['type'] as String? ?? '通用';
+      _style = _savedInput!['style'] as String? ?? '幽默';
+      _duration = (_savedInput!['duration'] as num?)?.toInt() ?? 60;
+    });
+  }
 
   static const _types = ['通用', '知识科普', '生活记录', '剧情故事', '产品测评', '才艺展示'];
   static const _styles = ['幽默', '治愈', '励志', '悬疑', '温情', '干货'];
@@ -49,6 +89,7 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
                 const SnackBar(content: Text('请输入视频主题')));
             return;
           }
+          _saveHistory();
           FocusScope.of(context).unfocus();
           Future.delayed(const Duration(milliseconds: 300),
               () { if (mounted) _streamKey.currentState?.start(); });
@@ -61,6 +102,7 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_savedInput != null) _RestoreBar(onRestore: _restoreInput),
             TextFormField(
               controller: _topicCtrl,
               decoration: const InputDecoration(
@@ -320,6 +362,45 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
   String _platform = '抖音';
   String? _contentDirection;
   List<String> _viralElements = [];
+  String _topicsResult = '';
+  Map<String, dynamic>? _savedInput;
+
+  static const _historyKey = 'viral_last';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final raw = await ref.read(localDataSourceProvider).getString(_historyKey);
+    if (raw != null && mounted) {
+      setState(() => _savedInput = jsonDecode(raw) as Map<String, dynamic>);
+    }
+  }
+
+  void _saveHistory() {
+    ref.read(localDataSourceProvider).saveString(_historyKey, jsonEncode({
+      'industry': _industryCtrl.text.trim(),
+      'strengths': _strengthsCtrl.text.trim(),
+      'platform': _platform,
+      'contentDirection': _contentDirection,
+      'viralElements': _viralElements,
+    }));
+  }
+
+  void _restoreInput() {
+    if (_savedInput == null) return;
+    setState(() {
+      _industryCtrl.text = _savedInput!['industry'] as String? ?? '';
+      _strengthsCtrl.text = _savedInput!['strengths'] as String? ?? '';
+      _platform = _savedInput!['platform'] as String? ?? '抖音';
+      _contentDirection = _savedInput!['contentDirection'] as String?;
+      _viralElements = List<String>.from(
+          (_savedInput!['viralElements'] as List?) ?? []);
+    });
+  }
 
   static const _platforms = ['抖音', 'B站', '小红书', '视频号', 'YouTube'];
   static const _directions = ['晒过程', '讲故事', '教知识', '聊观点'];
@@ -345,6 +426,7 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
                 const SnackBar(content: Text('请输入赛道领域')));
             return;
           }
+          _saveHistory();
           FocusScope.of(context).unfocus();
           Future.delayed(const Duration(milliseconds: 300),
               () { if (mounted) _streamKey.currentState?.start(); });
@@ -357,6 +439,7 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_savedInput != null) _RestoreBar(onRestore: _restoreInput),
             TextFormField(
               controller: _industryCtrl,
               decoration: const InputDecoration(
@@ -413,6 +496,7 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
               key: _streamKey,
               title: '爆款选题',
               isAdmin: auth.isAdmin,
+              onComplete: (t) => setState(() => _topicsResult = t),
               streamBuilder: (model) =>
                   api.streamPost(ApiConstants.viralTopics, {
                 'industry': _industryCtrl.text.trim(),
@@ -423,6 +507,15 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
                 'model': model,
               }),
             ),
+            if (_topicsResult.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 80),
+                child: OutlinedButton.icon(
+                  onPressed: () => context.go('/script'),
+                  icon: const Icon(Icons.article_outlined),
+                  label: const Text('去制作脚本'),
+                ),
+              ),
           ],
         ),
       ),
@@ -446,6 +539,45 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
   String _followers = '0 - 1千';
   String? _monetizeDirection;
   List<String> _contentTone = [];
+  String _topicsResult = '';
+  Map<String, dynamic>? _savedInput;
+
+  static const _historyKey = 'monetize_last';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final raw = await ref.read(localDataSourceProvider).getString(_historyKey);
+    if (raw != null && mounted) {
+      setState(() => _savedInput = jsonDecode(raw) as Map<String, dynamic>);
+    }
+  }
+
+  void _saveHistory() {
+    ref.read(localDataSourceProvider).saveString(_historyKey, jsonEncode({
+      'industry': _industryCtrl.text.trim(),
+      'strengths': _strengthsCtrl.text.trim(),
+      'followers': _followers,
+      'monetizeDirection': _monetizeDirection,
+      'contentTone': _contentTone,
+    }));
+  }
+
+  void _restoreInput() {
+    if (_savedInput == null) return;
+    setState(() {
+      _industryCtrl.text = _savedInput!['industry'] as String? ?? '';
+      _strengthsCtrl.text = _savedInput!['strengths'] as String? ?? '';
+      _followers = _savedInput!['followers'] as String? ?? '0 - 1千';
+      _monetizeDirection = _savedInput!['monetizeDirection'] as String?;
+      _contentTone = List<String>.from(
+          (_savedInput!['contentTone'] as List?) ?? []);
+    });
+  }
 
   static const _followerRanges = [
     '0 - 1千', '1千 - 1万', '1万 - 10万', '10万 - 100万', '100万以上'
@@ -471,6 +603,7 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
                 const SnackBar(content: Text('请输入赛道领域')));
             return;
           }
+          _saveHistory();
           FocusScope.of(context).unfocus();
           Future.delayed(const Duration(milliseconds: 300),
               () { if (mounted) _streamKey.currentState?.start(); });
@@ -483,6 +616,7 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (_savedInput != null) _RestoreBar(onRestore: _restoreInput),
             TextFormField(
               controller: _industryCtrl,
               decoration: const InputDecoration(labelText: '赛道领域 *'),
@@ -538,6 +672,7 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
               key: _streamKey,
               title: '变现选题',
               isAdmin: auth.isAdmin,
+              onComplete: (t) => setState(() => _topicsResult = t),
               streamBuilder: (model) =>
                   api.streamPost(ApiConstants.monetizeTopics, {
                 'industry': _industryCtrl.text.trim(),
@@ -548,6 +683,15 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
                 'model': model,
               }),
             ),
+            if (_topicsResult.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 80),
+                child: OutlinedButton.icon(
+                  onPressed: () => context.go('/script'),
+                  icon: const Icon(Icons.article_outlined),
+                  label: const Text('去制作脚本'),
+                ),
+              ),
           ],
         ),
       ),
@@ -1409,6 +1553,37 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
 
             const SizedBox(height: 80),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Shared restore-bar widget ──────────────────────────────────────────────────
+// Shown at the top of a form when a previous input snapshot is available.
+// Matches the web's "📋 使用上次输入" button pattern.
+
+class _RestoreBar extends StatelessWidget {
+  final VoidCallback onRestore;
+  const _RestoreBar({required this.onRestore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF6366f1),
+          side: const BorderSide(color: Color(0xFFc7d2fe), width: 1.5),
+          backgroundColor: const Color(0xFFf0f0ff),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          alignment: Alignment.centerLeft,
+        ),
+        onPressed: onRestore,
+        icon: const Text('📋', style: TextStyle(fontSize: 15)),
+        label: const Text(
+          '使用上次输入',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );

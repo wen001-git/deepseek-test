@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 /// Visualizes the structured JSON returned by the /api/content-plan endpoint.
 ///
@@ -118,61 +119,25 @@ class ContentPlanView extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
-        // ── C: 30-day calendar ─────────────────────────────────────────────
+        // ── C: 30-day flat list (no popup, every day has a script button) ──
         _SectionCard(
           title: '30天发布日历',
-          child: _CalendarGrid(
-            weeklyTemplate: weeklyTpl,
-            colorMap: colorMap,
-          ),
-        ),
-        const SizedBox(height: 12),
-
-        // ── D: Weekly template table ────────────────────────────────────────
-        _SectionCard(
-          title: '一周内容模板',
           child: Column(
-            children: weeklyTpl.map<Widget>((w) {
-              final day = w['day'] as String? ?? '';
-              final type = w['type'] as String? ?? '';
-              final theme = w['theme'] as String? ?? '';
-              final color = colorMap[type] ?? _colors[0];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 32,
-                      child: Text(day,
-                          style: textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurfaceVariant)),
-                    ),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(type,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500)),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(theme,
-                          style: textTheme.bodySmall,
-                          overflow: TextOverflow.visible),
-                    ),
-                  ],
-                ),
+            children: List.generate(30, (i) {
+              final dayNum = i + 1;
+              final entry = weeklyTpl.isNotEmpty
+                  ? weeklyTpl[i % weeklyTpl.length] as Map
+                  : <String, dynamic>{};
+              final type = entry['type'] as String? ?? '';
+              final theme = entry['theme'] as String? ?? '';
+              final color = colorMap[type] ?? const Color(0xFF999999);
+              return _DayListItem(
+                dayNum: dayNum,
+                type: type,
+                theme: theme,
+                color: color,
               );
-            }).toList(),
+            }),
           ),
         ),
         const SizedBox(height: 12),
@@ -207,105 +172,102 @@ class ContentPlanView extends StatelessWidget {
   }
 }
 
-// ── Calendar grid ──────────────────────────────────────────────────────────────
+// ── Day list item (replaces popup bubble) ─────────────────────────────────────
+// Shows one row: day circle | type badge | theme text | 制作脚本 button.
+// Theme text is selectable so users can copy it before tapping the button.
 
-class _CalendarGrid extends StatelessWidget {
-  final List<dynamic> weeklyTemplate;
-  final Map<String, Color> colorMap;
-
-  const _CalendarGrid(
-      {required this.weeklyTemplate, required this.colorMap});
-
-  @override
-  Widget build(BuildContext context) {
-    // Build type list ordered by day-of-week cycle
-    final typeByIndex = weeklyTemplate
-        .map((w) => w['type'] as String? ?? '')
-        .toList();
-
-    return Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: List.generate(30, (i) {
-        final dayNum = i + 1;
-        final type = typeByIndex.isNotEmpty
-            ? typeByIndex[i % typeByIndex.length]
-            : '';
-        final theme = weeklyTemplate.isNotEmpty
-            ? (weeklyTemplate[i % weeklyTemplate.length]['theme'] as String? ??
-                '')
-            : '';
-        final color = colorMap[type] ?? const Color(0xFF999999);
-        return _DayBubble(
-          day: dayNum,
-          type: type,
-          theme: theme,
-          color: color,
-        );
-      }),
-    );
-  }
-}
-
-class _DayBubble extends StatelessWidget {
-  final int day;
+class _DayListItem extends StatelessWidget {
+  final int dayNum;
   final String type;
   final String theme;
   final Color color;
 
-  const _DayBubble(
-      {required this.day,
-      required this.type,
-      required this.theme,
-      required this.color});
+  const _DayListItem({
+    required this.dayNum,
+    required this.type,
+    required this.theme,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text('第 $day 天'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(type,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500)),
-                ),
-              ]),
-              const SizedBox(height: 8),
-              Text(theme, style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('关闭'),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Colored day circle
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text(
+              '$dayNum',
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 6),
+          // Type badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              type,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Theme text — selectable for copying
+          Expanded(
+            child: SelectableText(
+              theme,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Navigate to script screen with topic pre-filled
+          _ScriptButton(topic: '$type：$theme'),
+        ],
       ),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        alignment: Alignment.center,
-        child: Text(
-          '$day',
-          style: const TextStyle(
-              color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+    );
+  }
+}
+
+// ── Compact "制作脚本" button ──────────────────────────────────────────────────
+
+class _ScriptButton extends StatelessWidget {
+  final String topic;
+  const _ScriptButton({required this.topic});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 26,
+      child: TextButton(
+        onPressed: () => GoRouter.of(context).go('/script', extra: topic),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: const Color(0xFF6366f1),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.article_outlined, size: 12),
+            SizedBox(width: 2),
+            Text('制作脚本', style: TextStyle(fontSize: 11)),
+          ],
         ),
       ),
     );

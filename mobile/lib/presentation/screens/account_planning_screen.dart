@@ -43,6 +43,10 @@ class _AccountPlanningScreenState
   static const _contentFormatOptions = ['口播', 'Vlog', '知识讲解', '剧情', '测评', '教程'];
   static const _platformOptions = ['抖音', 'B站', '小红书', '视频号', 'YouTube'];
 
+  // ── Step 1 history ───────────────────────────────────────────────────────
+  Map<String, dynamic>? _savedInput;
+  static const _historyKey = 'account_step1_last';
+
   // ── Step 1 result ────────────────────────────────────────────────────────
   final _step1Key = GlobalKey<StreamingWidgetState>();
   bool _step1Done = false;
@@ -71,6 +75,48 @@ class _AccountPlanningScreenState
   int _step2StreamingChars = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final raw =
+        await ref.read(localDataSourceProvider).getString(_historyKey);
+    if (raw != null && mounted) {
+      setState(
+          () => _savedInput = jsonDecode(raw) as Map<String, dynamic>);
+    }
+  }
+
+  void _saveHistory() {
+    ref.read(localDataSourceProvider).saveString(_historyKey, jsonEncode({
+      'industry': _industryCtrl.text.trim(),
+      'strengths': _strengthsCtrl.text.trim(),
+      'accountTypes': _accountTypes,
+      'contentStyles': _contentStyles,
+      'contentFormats': _contentFormats,
+      'platforms': _platforms,
+    }));
+  }
+
+  void _restoreInput() {
+    if (_savedInput == null) return;
+    setState(() {
+      _industryCtrl.text = _savedInput!['industry'] as String? ?? '';
+      _strengthsCtrl.text = _savedInput!['strengths'] as String? ?? '';
+      _accountTypes =
+          List<String>.from((_savedInput!['accountTypes'] as List?) ?? []);
+      _contentStyles =
+          List<String>.from((_savedInput!['contentStyles'] as List?) ?? []);
+      _contentFormats =
+          List<String>.from((_savedInput!['contentFormats'] as List?) ?? []);
+      _platforms =
+          List<String>.from((_savedInput!['platforms'] as List?) ?? []);
+    });
+  }
+
+  @override
   void dispose() {
     _industryCtrl.dispose();
     _strengthsCtrl.dispose();
@@ -86,6 +132,7 @@ class _AccountPlanningScreenState
           const SnackBar(content: Text('请填写行业领域和特长优势')));
       return;
     }
+    _saveHistory();
     // Dismiss keyboard first, then start streaming after the IME hide
     // animation completes (~300 ms) to avoid compositor jank.
     FocusScope.of(context).unfocus();
@@ -203,6 +250,8 @@ class _AccountPlanningScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_savedInput != null)
+                    _RestoreBar(onRestore: _restoreInput),
                   TextFormField(
                     controller: _industryCtrl,
                     decoration: const InputDecoration(
@@ -268,6 +317,15 @@ class _AccountPlanningScreenState
                       'model': model,
                     }),
                   ),
+                  if (_step1Done)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: OutlinedButton.icon(
+                        onPressed: () => context.go('/script'),
+                        icon: const Icon(Icons.article_outlined),
+                        label: const Text('去制作脚本'),
+                      ),
+                    ),
                   FilledButton.icon(
                     onPressed: _submitStep1,
                     icon: const Icon(Icons.auto_awesome),
@@ -604,5 +662,34 @@ class _ChipGroup extends StatelessWidget {
         }).toList(),
       ),
     ]);
+  }
+}
+
+// ── Restore-bar widget ────────────────────────────────────────────────────────
+
+class _RestoreBar extends StatelessWidget {
+  final VoidCallback onRestore;
+  const _RestoreBar({required this.onRestore});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF6366f1),
+          side: const BorderSide(color: Color(0xFFc7d2fe), width: 1.5),
+          backgroundColor: const Color(0xFFf0f0ff),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          alignment: Alignment.centerLeft,
+        ),
+        onPressed: onRestore,
+        icon: const Text('📋', style: TextStyle(fontSize: 15)),
+        label: const Text(
+          '使用上次输入',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
   }
 }

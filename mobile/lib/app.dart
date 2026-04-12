@@ -60,7 +60,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/profile', builder: (_, _s) => const ProfileScreen()),
       GoRoute(path: '/hot-trends', builder: (_, _s) => const HotTrendsScreen()),
       GoRoute(path: '/account-planning', builder: (_, _s) => const AccountPlanningScreen()),
-      GoRoute(path: '/script', builder: (_, _s) => const ScriptScreen()),
+      GoRoute(
+        path: '/script',
+        builder: (_, state) =>
+            ScriptScreen(initialTopic: state.extra as String?),
+      ),
       GoRoute(
         path: '/shot-table',
         builder: (_, state) =>
