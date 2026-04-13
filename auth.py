@@ -31,6 +31,8 @@ def login():
             error = '账号已被禁用，请联系管理员'
         elif user['expires_at'] and date.today().isoformat() > user['expires_at']:
             error = '账号已过期，请联系管理员续期'
+        elif user['role'] != 'admin' and (user['platform'] if 'platform' in user.keys() else 'web') == 'android':
+            error = '该账号为 APP 专属账号，请使用 Android APP 登录'
         elif fingerprint == 'unknown':
             error = '设备识别失败，请刷新页面后重试'
         else:

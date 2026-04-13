@@ -11,6 +11,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/constants/api_constants.dart';
 import '../widgets/streaming_widget.dart';
 import '../widgets/content_plan_view.dart';
+import '../widgets/shot_table_view.dart';
 
 // ── 1. 脚本制作 ────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,7 @@ class _ShotTableScreenState extends ConsumerState<ShotTableScreen> {
   late final _scriptCtrl =
       TextEditingController(text: widget.initialScript ?? '');
   final _streamKey = GlobalKey<StreamingWidgetState>();
+  List<Map<String, String>>? _parsedShots;
 
   @override
   Widget build(BuildContext context) {
@@ -195,42 +197,61 @@ class _ShotTableScreenState extends ConsumerState<ShotTableScreen> {
             onPressed: () => context.go('/home')),
         title: const Text('分镜拍摄表'),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          if (_scriptCtrl.text.trim().isEmpty) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请粘贴视频脚本')));
-            return;
-          }
-          FocusScope.of(context).unfocus();
-          Future.delayed(const Duration(milliseconds: 300),
-              () { if (mounted) _streamKey.currentState?.start(); });
-        },
-        icon: const Icon(Icons.auto_awesome),
-        label: const Text('生成分镜表'),
-      ),
+      floatingActionButton: _parsedShots == null
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                if (_scriptCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('请粘贴视频脚本')));
+                  return;
+                }
+                FocusScope.of(context).unfocus();
+                Future.delayed(const Duration(milliseconds: 300),
+                    () { if (mounted) _streamKey.currentState?.start(); });
+              },
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('生成分镜表'),
+            )
+          : null,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextFormField(
-              controller: _scriptCtrl,
-              decoration: const InputDecoration(
-                  labelText: '视频脚本 *', hintText: '粘贴已生成的脚本内容'),
-              maxLines: 6,
-            ),
-            const SizedBox(height: 16),
-            StreamingWidget(
-              key: _streamKey,
-              title: '分镜拍摄表',
-              isAdmin: auth.isAdmin,
-              streamBuilder: (model) =>
-                  api.streamPost(ApiConstants.shotTable, {
-                'script': _scriptCtrl.text.trim(),
-                'model': model,
-              }),
-            ),
+            if (_parsedShots == null) ...[
+              TextFormField(
+                controller: _scriptCtrl,
+                decoration: const InputDecoration(
+                    labelText: '视频脚本 *', hintText: '粘贴已生成的脚本内容'),
+                maxLines: 6,
+              ),
+              const SizedBox(height: 16),
+              StreamingWidget(
+                key: _streamKey,
+                title: '分镜拍摄表',
+                isAdmin: auth.isAdmin,
+                streamBuilder: (model) =>
+                    api.streamPost(ApiConstants.shotTable, {
+                  'script': _scriptCtrl.text.trim(),
+                  'model': model,
+                }),
+                onComplete: (text) {
+                  final shots = parseShotTable(text);
+                  if (shots.isNotEmpty && mounted) {
+                    setState(() => _parsedShots = shots);
+                  }
+                },
+              ),
+            ] else ...[
+              ShotTableView(shots: _parsedShots!),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => setState(() => _parsedShots = null),
+                icon: const Icon(Icons.refresh),
+                label: const Text('重新生成'),
+              ),
+              const SizedBox(height: 80),
+            ],
           ],
         ),
       ),

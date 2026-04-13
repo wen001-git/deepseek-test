@@ -45,6 +45,7 @@ def init_db():
         ("subscription_tier", "TEXT DEFAULT 'free'"),
         ("google_play_token", "TEXT DEFAULT NULL"),
         ("subscription_product_id", "TEXT DEFAULT NULL"),
+        ("platform", "TEXT DEFAULT 'web'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -86,12 +87,12 @@ def get_all_users():
     conn.close()
     return users
 
-def create_user(username, password, role='user', notes='', expires_at=None):
+def create_user(username, password, role='user', notes='', expires_at=None, platform='web'):
     conn = get_db()
     try:
         conn.execute(
-            "INSERT INTO users (username, password_hash, plain_password, role, notes, expires_at) VALUES (?, ?, ?, ?, ?, ?)",
-            (username, generate_password_hash(password, method='pbkdf2:sha256'), password, role, notes, expires_at or None)
+            "INSERT INTO users (username, password_hash, plain_password, role, notes, expires_at, platform) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (username, generate_password_hash(password, method='pbkdf2:sha256'), password, role, notes, expires_at or None, platform)
         )
         conn.commit()
         return True, None
@@ -199,6 +200,13 @@ def update_user_subscription(user_id, tier, purchase_token, product_id, expires_
         "UPDATE users SET subscription_tier=?, google_play_token=?, subscription_product_id=?, expires_at=? WHERE id=?",
         (tier, purchase_token, product_id, expires_at, user_id)
     )
+    conn.commit()
+    conn.close()
+
+
+def update_user_platform(user_id, platform):
+    conn = get_db()
+    conn.execute("UPDATE users SET platform = ? WHERE id = ?", (platform, user_id))
     conn.commit()
     conn.close()
 

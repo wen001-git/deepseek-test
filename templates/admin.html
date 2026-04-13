@@ -24,8 +24,8 @@
     .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
     .form-group { flex: 1; min-width: 140px; }
     .form-group label { display: block; font-size: 12px; color: #888; margin-bottom: 5px; }
-    .form-group input { width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: inherit; background: #fafafa; color: #333; outline: none; }
-    .form-group input:focus { border-color: #6366f1; background: #fff; }
+    .form-group input, .form-group select { width: 100%; padding: 10px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 14px; font-family: inherit; background: #fafafa; color: #333; outline: none; }
+    .form-group input:focus, .form-group select:focus { border-color: #6366f1; background: #fff; }
     .btn-add { padding: 10px 20px; background: #6366f1; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
     .btn-add:hover { background: #4f46e5; }
 
@@ -40,6 +40,8 @@
     .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
     .badge-admin { background: #ede9fe; color: #6d28d9; }
     .badge-user  { background: #f0fdf4; color: #15803d; }
+    .badge-web     { background: #eff6ff; color: #1d4ed8; }
+    .badge-android { background: #f0fdf4; color: #15803d; }
 
     .device-count { font-weight: 700; color: #6366f1; }
     .device-count.full { color: #ef4444; }
@@ -142,6 +144,13 @@
           <label>到期日（选填）</label>
           <input type="date" name="expires_at">
         </div>
+        <div class="form-group" style="min-width:110px;max-width:140px">
+          <label>平台</label>
+          <select name="platform">
+            <option value="web">🌐 Web</option>
+            <option value="android">📱 Android APP</option>
+          </select>
+        </div>
         <button type="submit" class="btn-add">+ 添加</button>
       </div>
     </form>
@@ -187,7 +196,19 @@
               <button class="btn-edit-notes" onclick="editNotes({{ u.id }})" title="编辑备注">✏️</button>
             </div>
           </td>
-          <td><span class="badge badge-{{ u.role }}">{{ u.role }}</span></td>
+          <td>
+            <span class="badge badge-{{ u.role }}">{{ u.role }}</span>
+            {% if u.role != 'admin' %}
+            <span class="badge badge-{{ u.platform or 'web' }}" style="margin-left:4px;cursor:pointer"
+                  id="plat-badge-{{ u.id }}"
+                  onclick="togglePlatform({{ u.id }}, '{{ u.platform or 'web' }}')"
+                  title="点击切换平台">
+              {{ '📱 APP' if u.platform == 'android' else '🌐 Web' }}
+            </span>
+            {% else %}
+            <span class="badge badge-web" style="margin-left:4px">🌐 Web</span>
+            {% endif %}
+          </td>
           <td>
             <span class="device-count {% if u.device_count >= 3 %}full{% endif %}">
               {{ u.device_count }} / 3
@@ -351,6 +372,25 @@
       input.style.display = 'none';
       text.style.display = '';
     });
+  }
+
+  async function togglePlatform(id, current) {
+    const next = current === 'android' ? 'web' : 'android';
+    const label = next === 'android' ? '📱 APP' : '🌐 Web';
+    const r = await fetch('/admin/users/platform/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform: next })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      const badge = document.getElementById('plat-badge-' + id);
+      badge.textContent = label;
+      badge.className = 'badge badge-' + next;
+      badge.setAttribute('onclick', "togglePlatform(" + id + ", '" + next + "')");
+    } else {
+      alert(data.error || '切换失败');
+    }
   }
 
   async function savePassword(id) {

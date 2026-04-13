@@ -1,5 +1,6 @@
 import os
 import re
+import requests
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
 from deepseek_client import generate_stream
 from database import init_db
@@ -281,6 +282,38 @@ def api_breakdown_sharetext():
     prompt = build_breakdown_sharetext_prompt(sharetext, fetched_content)
     system = BREAKDOWN_SYSTEM_PROMPT if fetched_content else ""
     return stream_response(system, prompt, data.get("model"))
+
+
+@app.route("/api/generate-image")
+def api_generate_image():
+    import time, urllib.parse
+    prompt = request.args.get("prompt", "").strip()
+    if not prompt:
+        return jsonify({"error": "请提供提示词"}), 400
+    seed = request.args.get("seed", "42")
+    # wh: pre-built "width=W&height=H" string; defaults to portrait 2:3
+    wh = request.args.get("wh", "512&height=768")
+    url = (
+        "https://image.pollinations.ai/prompt/"
+        + urllib.parse.quote(prompt)
+        + f"?width={wh}&model=flux&seed={seed}"
+    )
+    last_err = "未知错误"
+    for attempt in range(3):
+        try:
+            if attempt > 0:
+                time.sleep(4)
+            resp = requests.get(url, timeout=90, headers={"User-Agent": "Mozilla/5.0"})
+            if resp.status_code == 200:
+                content_type = resp.headers.get("content-type", "image/jpeg")
+                if content_type.startswith("image/"):
+                    return Response(resp.content, content_type=content_type)
+                last_err = "返回格式错误"
+            else:
+                last_err = f"HTTP {resp.status_code}"
+        except Exception as e:
+            last_err = str(e)
+    return jsonify({"error": last_err}), 502
 
 
 @app.route("/api/fetch-url", methods=["POST"])

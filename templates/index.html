@@ -393,6 +393,7 @@
       <div class="nav-item" onclick="switchPanel('imitate', this)"><span class="icon">✍️</span> 爆款仿写</div>
       {% if is_admin %}<div class="nav-item" onclick="switchPanel('hottrends', this)"><span class="icon">🌡️</span> 热点追踪</div>{% endif %}
       {% if is_admin %}<div class="nav-item" onclick="switchPanel('director', this)"><span class="icon">🎬</span> 编导专栏</div>{% endif %}
+      <div class="nav-item" onclick="switchPanel('text2img', this)"><span class="icon">🖼️</span> 文生图</div>
     </div>
     <div style="margin-top:auto; padding: 16px 20px; border-top: 1px solid #2d2d4e;">
       <div onclick="switchPanel('profile', null)" style="font-size:13px; color:#a5b4fc; margin-bottom:10px; cursor:pointer; display:flex; align-items:center; gap:6px;">
@@ -1048,6 +1049,37 @@
       </div>
     </div>{% endif %}
 
+    <!-- 🖼️ 文生图 -->
+    <div class="panel" id="panel-text2img">
+      <div class="panel-title">🖼️ 文生图</div>
+      <div class="panel-desc">输入文字描述，AI 生成配图（由 Pollinations.ai 提供，免费使用）</div>
+      <div class="card">
+        <div class="field-label">图片描述（支持中英文）</div>
+        <textarea id="t2i-prompt" rows="4" style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:14px;font-family:inherit;resize:vertical;outline:none"
+          placeholder="例如：一位女博主站在草原上，夸张生动的表情，背景绿色草地，阳光明媚，电影感，8k高清"></textarea>
+        <div style="margin-top:12px">
+          <div class="field-label">画面比例</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+              <input type="radio" name="t2i-ratio" value="portrait" checked style="accent-color:#6366f1"> 竖版 9:16（短视频）
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+              <input type="radio" name="t2i-ratio" value="square" style="accent-color:#6366f1"> 方形 1:1
+            </label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:13px">
+              <input type="radio" name="t2i-ratio" value="landscape" style="accent-color:#6366f1"> 横版 16:9
+            </label>
+          </div>
+        </div>
+        <button id="t2i-btn" onclick="generateText2Img()"
+          style="margin-top:16px;width:100%;padding:14px;background:#6366f1;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">
+          🎨 生成图片
+        </button>
+        <div id="t2i-status" style="margin-top:10px;font-size:12px;color:#aaa;min-height:16px;text-align:center"></div>
+        <div id="t2i-result" style="margin-top:12px;text-align:center"></div>
+      </div>
+    </div>
+
     <!-- 👤 我的账号 -->
     <div class="panel" id="panel-profile">
       <div class="panel-title">👤 我的账号</div>
@@ -1114,6 +1146,9 @@
     {% if is_admin %}<div class="bottom-nav-item" onclick="switchPanel('hottrends', this)">
       <span class="b-icon">🌡️</span><span class="b-label">热点</span>
     </div>{% endif %}
+    <div class="bottom-nav-item" onclick="switchPanel('text2img', this)">
+      <span class="b-icon">🖼️</span><span class="b-label">文生图</span>
+    </div>
     <div class="bottom-nav-item" onclick="switchPanel('profile', this)">
       <span class="b-icon">👤</span><span class="b-label">我的</span>
     </div>
@@ -1727,26 +1762,21 @@
     });
   }
 
-  function genShotImage(uid, prompt) {
+  async function genShotImage(uid, prompt) {
     const slot = document.getElementById('shot-img-' + uid);
     if (!slot) return;
-    slot.innerHTML = '<span style="font-size:11px;color:#aaa">生成中，请稍候（约15–30秒）...</span>';
-    const url = 'https://image.pollinations.ai/prompt/' +
-      encodeURIComponent(prompt) +
-      '?width=768&height=512&nologo=true&model=flux&seed=' + Math.floor(Math.random() * 99999);
-    const img = new Image();
-    img.onload = () => {
-      slot.innerHTML = '';
-      img.style.cssText = 'width:100%;max-width:320px;border-radius:8px;border:1px solid #e5e7eb;display:block;margin-top:4px;cursor:pointer';
-      img.title = '点击在新标签页查看原图';
-      img.onclick = () => window.open(url, '_blank');
-      slot.appendChild(img);
-    };
-    img.onerror = () => {
+    const btn = slot.previousElementSibling;
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+    slot.innerHTML = '<span style="font-size:11px;color:#aaa">生成中，请稍候（约20–40秒）...</span>';
+    const seed = Math.floor(Math.random() * 99999);
+    const url = '/api/generate-image?prompt=' + encodeURIComponent(prompt) + '&seed=' + seed;
+    const directUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=768&height=512&model=flux&seed=' + seed;
+
+    const showError = (msg) => {
       slot.innerHTML = '';
       const errSpan = document.createElement('span');
       errSpan.style.cssText = 'font-size:11px;color:#ef4444';
-      errSpan.textContent = '生成失败，';
+      errSpan.textContent = (msg || '生成失败') + '，';
       const retryBtn = document.createElement('button');
       retryBtn.textContent = '重试';
       retryBtn.style.cssText = 'font-size:11px;color:#6366f1;background:none;border:none;cursor:pointer;padding:0';
@@ -1754,7 +1784,68 @@
       slot.appendChild(errSpan);
       slot.appendChild(retryBtn);
     };
-    img.src = url;
+
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) { showError('HTTP ' + resp.status); return; }
+      const contentType = resp.headers.get('content-type') || '';
+      if (!contentType.startsWith('image/')) { showError('返回格式错误'); return; }
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      slot.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = blobUrl;
+      img.style.cssText = 'width:100%;max-width:320px;border-radius:8px;border:1px solid #e5e7eb;display:block;margin-top:4px;cursor:pointer';
+      img.title = '点击在新标签页查看原图';
+      img.onclick = () => window.open(directUrl, '_blank');
+      slot.appendChild(img);
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.style.opacity = ''; }
+    }
+  }
+
+  async function generateText2Img() {
+    const prompt = document.getElementById('t2i-prompt').value.trim();
+    if (!prompt) { alert('请输入图片描述'); return; }
+    const ratio = document.querySelector('input[name="t2i-ratio"]:checked')?.value || 'portrait';
+    const dims = { portrait: '512&height=768', square: '768&height=768', landscape: '910&height=512' };
+    const wh = dims[ratio];
+    const btn = document.getElementById('t2i-btn');
+    const status = document.getElementById('t2i-status');
+    const result = document.getElementById('t2i-result');
+    btn.disabled = true; btn.style.opacity = '0.6';
+    status.textContent = '生成中，请稍候（约 20–40 秒）...';
+    result.innerHTML = '';
+    const seed = Math.floor(Math.random() * 99999);
+    const url = '/api/generate-image?prompt=' + encodeURIComponent(prompt) + '&seed=' + seed + '&wh=' + wh;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) { status.textContent = '生成失败：HTTP ' + resp.status; return; }
+      const ct = resp.headers.get('content-type') || '';
+      if (!ct.startsWith('image/')) { status.textContent = '生成失败：返回格式错误'; return; }
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      status.textContent = '生成成功！';
+      const img = document.createElement('img');
+      img.src = blobUrl;
+      img.style.cssText = 'max-width:100%;border-radius:12px;border:1px solid #e5e7eb;display:block;margin:0 auto;cursor:pointer';
+      img.title = '点击在新标签页查看原图';
+      const directUrl = 'https://image.pollinations.ai/prompt/' + encodeURIComponent(prompt) + '?width=' + wh + '&model=flux&seed=' + seed;
+      img.onclick = () => window.open(directUrl, '_blank');
+      const dlBtn = document.createElement('a');
+      dlBtn.href = blobUrl; dlBtn.download = 'image.jpg';
+      dlBtn.textContent = '⬇️ 下载图片';
+      dlBtn.style.cssText = 'display:inline-block;margin-top:10px;font-size:13px;color:#6366f1;text-decoration:none';
+      result.appendChild(img);
+      result.appendChild(document.createElement('br'));
+      result.appendChild(dlBtn);
+    } catch (e) {
+      status.textContent = '生成失败：' + e.message;
+    } finally {
+      btn.disabled = false; btn.style.opacity = '';
+    }
   }
 
   async function generateShotTable() {
