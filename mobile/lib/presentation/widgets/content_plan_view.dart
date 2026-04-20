@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/locale_provider.dart';
 
 /// Visualizes the structured JSON returned by the /api/content-plan endpoint.
 ///
@@ -12,7 +14,7 @@ import 'package:go_router/go_router.dart';
 ///   "growth_advice": String,
 ///   "reasons": {"posting_time": str, "content_mix": str, "weekly_rhythm": str}
 /// }
-class ContentPlanView extends StatelessWidget {
+class ContentPlanView extends ConsumerWidget {
   final Map<String, dynamic> plan;
 
   const ContentPlanView({super.key, required this.plan});
@@ -39,7 +41,8 @@ class ContentPlanView extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     final typeDist = (plan['type_distribution'] as List?) ?? [];
     final weeklyTpl = (plan['weekly_template'] as List?) ?? [];
     final colorMap = _buildColorMap(typeDist);
@@ -54,14 +57,14 @@ class ContentPlanView extends StatelessWidget {
           child: Row(children: [
             Expanded(
               child: _MetaTile(
-                label: '每天发布',
-                value: '${plan['daily_count'] ?? '-'} 条',
+                label: s.postsPerDay,
+                value: s.postsCount(plan['daily_count'] ?? '-'),
               ),
             ),
             Container(width: 1, height: 48, color: colorScheme.outlineVariant),
             Expanded(
               child: _MetaTile(
-                label: '最佳发布时间',
+                label: s.bestPostTimes,
                 value: ((plan['best_post_times'] as List?) ?? []).join('、'),
               ),
             ),
@@ -71,7 +74,7 @@ class ContentPlanView extends StatelessWidget {
 
         // ── B: Distribution bars ────────────────────────────────────────────
         _SectionCard(
-          title: '内容类型分布',
+          title: s.contentTypeDist,
           child: Column(
             children: typeDist.map<Widget>((t) {
               final name = t['name'] as String? ?? '';
@@ -121,7 +124,7 @@ class ContentPlanView extends StatelessWidget {
 
         // ── C: 30-day flat list (no popup, every day has a script button) ──
         _SectionCard(
-          title: '30天发布日历',
+          title: s.thirtyDayCalendar,
           child: Column(
             children: List.generate(30, (i) {
               final dayNum = i + 1;
@@ -145,7 +148,7 @@ class ContentPlanView extends StatelessWidget {
         // ── E: Growth advice ───────────────────────────────────────────────
         if ((plan['growth_advice'] as String?)?.isNotEmpty == true)
           _SectionCard(
-            title: '成长建议',
+            title: s.growthAdvice,
             child: Text(plan['growth_advice'] as String,
                 style: textTheme.bodyMedium),
           ),
@@ -154,15 +157,15 @@ class ContentPlanView extends StatelessWidget {
         // ── F: Reasons (expandable) ────────────────────────────────────────
         if ((plan['reasons'] as Map?) != null) ...[
           _ReasonTile(
-            label: '💡 为什么选这些发布时间？',
+            label: s.whyPostTimes,
             text: (plan['reasons'] as Map)['posting_time'] as String? ?? '',
           ),
           _ReasonTile(
-            label: '💡 为什么这样分配内容类型？',
+            label: s.whyContentMix,
             text: (plan['reasons'] as Map)['content_mix'] as String? ?? '',
           ),
           _ReasonTile(
-            label: '💡 为什么这样安排一周节奏？',
+            label: s.whyWeeklyRhythm,
             text: (plan['reasons'] as Map)['weekly_rhythm'] as String? ?? '',
           ),
           const SizedBox(height: 8),
@@ -245,12 +248,13 @@ class _DayListItem extends StatelessWidget {
 
 // ── Compact "制作脚本" button ──────────────────────────────────────────────────
 
-class _ScriptButton extends StatelessWidget {
+class _ScriptButton extends ConsumerWidget {
   final String topic;
   const _ScriptButton({required this.topic});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     return SizedBox(
       height: 26,
       child: TextButton(
@@ -261,12 +265,12 @@ class _ScriptButton extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           foregroundColor: const Color(0xFF6366f1),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.article_outlined, size: 12),
-            SizedBox(width: 2),
-            Text('制作脚本', style: TextStyle(fontSize: 11)),
+            const Icon(Icons.article_outlined, size: 12),
+            const SizedBox(width: 2),
+            Text(s.makeScript, style: const TextStyle(fontSize: 11)),
           ],
         ),
       ),

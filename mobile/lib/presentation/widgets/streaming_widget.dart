@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../providers/locale_provider.dart';
 
 /// Consumes a Stream<String> of text chunks from Flask and renders them
 /// as Markdown in real time.
@@ -14,7 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 ///
 /// [isAdmin] enables the collapsible Prompt Debug panel which parses and
 /// strips the [DEBUG:{json}:DEBUG] prefix the server injects for admins.
-class StreamingWidget extends StatefulWidget {
+class StreamingWidget extends ConsumerStatefulWidget {
   final Stream<String> Function(String model) streamBuilder;
   final String title;
   final bool isAdmin;
@@ -33,10 +35,10 @@ class StreamingWidget extends StatefulWidget {
   });
 
   @override
-  State<StreamingWidget> createState() => StreamingWidgetState();
+  ConsumerState<StreamingWidget> createState() => StreamingWidgetState();
 }
 
-class StreamingWidgetState extends State<StreamingWidget> {
+class StreamingWidgetState extends ConsumerState<StreamingWidget> {
   String _model = 'deepseek-chat';
   final StringBuffer _buffer = StringBuffer();
   String _text = '';           // full received text
@@ -47,12 +49,6 @@ class StreamingWidgetState extends State<StreamingWidget> {
   String? _error;
   _DebugData? _debug;
 
-  // Progressive status messages while waiting for the first token
-  static const _waitingMessages = [
-    '正在连接 AI…',
-    'AI 思考中，请稍候…',
-    '即将开始输出，请耐心等待…',
-  ];
   int _waitingMsgIndex = 0;
   Timer? _waitingTimer;
 
@@ -68,9 +64,9 @@ class StreamingWidgetState extends State<StreamingWidget> {
         _waitingTimer?.cancel();
         return;
       }
+      final lastIndex = 2;
       setState(() {
-        _waitingMsgIndex =
-            (_waitingMsgIndex + 1).clamp(0, _waitingMessages.length - 1);
+        _waitingMsgIndex = (_waitingMsgIndex + 1).clamp(0, lastIndex);
       });
     });
   }
@@ -196,9 +192,9 @@ class StreamingWidgetState extends State<StreamingWidget> {
 
   void _copy() {
     Clipboard.setData(ClipboardData(text: _text));
+    final s = ref.read(stringsProvider);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('已复制到剪贴板'), duration: Duration(seconds: 2)),
+      SnackBar(content: Text(s.copiedToClipboard), duration: const Duration(seconds: 2)),
     );
   }
 
@@ -206,6 +202,13 @@ class StreamingWidgetState extends State<StreamingWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
+    final waitingMessages = [
+      s.connectingAi,
+      s.aiThinkingWait,
+      s.outputStartingSoon,
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -215,16 +218,16 @@ class StreamingWidgetState extends State<StreamingWidget> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          segments: const [
+          segments: [
             ButtonSegment(
               value: 'deepseek-chat',
               icon: Icon(Icons.bolt, size: 14),
-              label: Text('快速生成', style: TextStyle(fontSize: 12)),
+              label: Text(s.quickGenerate, style: const TextStyle(fontSize: 12)),
             ),
             ButtonSegment(
               value: 'deepseek-reasoner',
               icon: Icon(Icons.psychology_outlined, size: 14),
-              label: Text('深度思考', style: TextStyle(fontSize: 12)),
+              label: Text(s.deepThink, style: const TextStyle(fontSize: 12)),
             ),
           ],
           selected: {_model},
@@ -259,12 +262,12 @@ class StreamingWidgetState extends State<StreamingWidget> {
               TextButton.icon(
                 onPressed: _copy,
                 icon: const Icon(Icons.copy, size: 16),
-                label: const Text('复制'),
+                label: Text(s.copy),
               ),
               TextButton.icon(
                 onPressed: _share,
                 icon: const Icon(Icons.share, size: 16),
-                label: const Text('分享'),
+                label: Text(s.share),
               ),
             ],
           ),
@@ -299,11 +302,11 @@ class StreamingWidgetState extends State<StreamingWidget> {
               Text(
                 _firstTokenReceived
                     ? (_model == 'deepseek-reasoner'
-                        ? '深度思考中，通常需要 20-40 秒…'
-                        : '生成中…')
+                        ? s.deepThinkingDelay
+                        : s.generating)
                     : (_model == 'deepseek-reasoner'
-                        ? '深度思考中，通常需要 20-40 秒…'
-                        : _waitingMessages[_waitingMsgIndex]),
+                        ? s.deepThinkingDelay
+                        : waitingMessages[_waitingMsgIndex]),
                 style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ]),

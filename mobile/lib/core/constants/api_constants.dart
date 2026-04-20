@@ -1,6 +1,13 @@
 class ApiConstants {
-  static const String baseUrl = 'https://video-creation-0fjy.onrender.com';
-  // Local dev (Android emulator): use 'http://10.0.2.2:5000'
+  static const String _defaultBaseUrl = 'https://video-creation-0fjy.onrender.com';
+  static const String _configuredBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: _defaultBaseUrl,
+  );
+  static String get baseUrl => _configuredBaseUrl.endsWith('/')
+      ? _configuredBaseUrl.substring(0, _configuredBaseUrl.length - 1)
+      : _configuredBaseUrl;
+  // Local dev (Android emulator): use --dart-define=API_BASE_URL=http://10.0.2.2:5000
 
   // Mobile auth endpoints
   static const String login = '/api/mobile/login';

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../l10n/app_strings.dart';
+import '../../providers/locale_provider.dart';
 
 // ── Parser ────────────────────────────────────────────────────────────────────
 
@@ -62,7 +65,7 @@ List<String> _splitCells(String row) {
 // ── Main view ─────────────────────────────────────────────────────────────────
 
 /// Renders a list of parsed shot rows as mobile-friendly cards.
-class ShotTableView extends StatelessWidget {
+class ShotTableView extends ConsumerWidget {
   final List<Map<String, String>> shots;
 
   const ShotTableView({super.key, required this.shots});
@@ -80,7 +83,8 @@ class ShotTableView extends StatelessWidget {
       _shotTypeColors[type] ?? _defaultColor;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: shots.map((shot) {
@@ -109,6 +113,7 @@ class ShotTableView extends StatelessWidget {
           itvZh: itv.zh,
           itvEn: itv.en,
           color: color,
+          s: s,
         );
       }).toList(),
     );
@@ -129,6 +134,7 @@ class _ShotCard extends StatelessWidget {
   final String itvZh;
   final String itvEn;
   final Color color;
+  final AppStrings s;
 
   const _ShotCard({
     required this.shotNum,
@@ -142,6 +148,7 @@ class _ShotCard extends StatelessWidget {
     required this.itvZh,
     required this.itvEn,
     required this.color,
+    required this.s,
   });
 
   bool _hasContent(String s) => s.isNotEmpty && s != '—' && s != '-';
@@ -207,7 +214,7 @@ class _ShotCard extends StatelessWidget {
                       border: Border.all(color: color.withOpacity(0.4)),
                     ),
                     child: Text(
-                      '$duration 秒',
+                      '$duration ${s.seconds}',
                       style: TextStyle(
                           color: color,
                           fontSize: 11,
@@ -228,7 +235,7 @@ class _ShotCard extends StatelessWidget {
                 if (_hasContent(scene))
                   _BodyField(
                     emoji: '🎬',
-                    label: '画面',
+                    label: s.sceneLabel,
                     text: scene,
                     selectable: true,
                     textTheme: textTheme,
@@ -237,7 +244,7 @@ class _ShotCard extends StatelessWidget {
                 if (_hasContent(narration))
                   _BodyField(
                     emoji: '🎙',
-                    label: '台词',
+                    label: s.dialogLabel,
                     text: narration,
                     selectable: true,
                     textTheme: textTheme,
@@ -246,7 +253,7 @@ class _ShotCard extends StatelessWidget {
                 if (_hasContent(notes))
                   _BodyField(
                     emoji: '📝',
-                    label: '备注',
+                    label: s.notesLabel,
                     text: notes,
                     selectable: false,
                     textTheme: textTheme,
@@ -271,7 +278,7 @@ class _ShotCard extends StatelessWidget {
                       size: 14, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 6),
                   Text(
-                    'AI 提示词 · Midjourney / Runway',
+                    s.aiPromptsTitle,
                     style: textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Theme.of(context).colorScheme.primary),
@@ -281,18 +288,20 @@ class _ShotCard extends StatelessWidget {
                   if (_hasContent(ttiEn))
                     _PromptField(
                       icon: '🖼',
-                      label: '文生图',
+                      label: s.textToImageLabel,
                       zh: ttiZh,
                       en: ttiEn,
                       textTheme: textTheme,
+                      s: s,
                     ),
                   if (_hasContent(itvEn))
                     _PromptField(
                       icon: '🎥',
-                      label: '图生视频',
+                      label: s.imageToVideoLabel,
                       zh: itvZh,
                       en: itvEn,
                       textTheme: textTheme,
+                      s: s,
                     ),
                 ],
               ),
@@ -360,6 +369,7 @@ class _PromptField extends StatelessWidget {
   final String zh;
   final String en;
   final TextTheme textTheme;
+  final AppStrings s;
 
   const _PromptField({
     required this.icon,
@@ -367,13 +377,14 @@ class _PromptField extends StatelessWidget {
     required this.zh,
     required this.en,
     required this.textTheme,
+    required this.s,
   });
 
   void _copy(BuildContext context) {
     Clipboard.setData(ClipboardData(text: en));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('已复制 $label 英文提示词'),
+        content: Text(s.copiedPrompt(label)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -401,10 +412,10 @@ class _PromptField extends StatelessWidget {
                 style: textTheme.bodySmall
                     ?.copyWith(fontWeight: FontWeight.w600)),
           ]),
-          // Chinese explanation (if available)
+          // Chinese/description explanation (if available)
           if (zh.isNotEmpty) ...[
             const SizedBox(height: 4),
-            Text('中：$zh',
+            Text('${s.zhPrefix}$zh',
                 style: textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
@@ -434,7 +445,7 @@ class _PromptField extends StatelessWidget {
                 IconButton(
                   onPressed: () => _copy(context),
                   icon: const Icon(Icons.copy, size: 16),
-                  tooltip: '复制英文提示词',
+                  tooltip: s.copyPromptTooltip,
                   style: IconButton.styleFrom(
                     padding: const EdgeInsets.all(6),
                     minimumSize: Size.zero,

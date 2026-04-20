@@ -5,6 +5,7 @@ import '../core/constants/app_constants.dart';
 import '../data/datasources/api_data_source.dart';
 import '../data/datasources/billing_data_source.dart';
 import 'auth_provider.dart';
+import 'locale_provider.dart';
 
 final billingDataSourceProvider =
     Provider<BillingDataSource>((_) => BillingDataSource());
@@ -55,9 +56,10 @@ class BillingNotifier extends StateNotifier<BillingState> {
           await _verifyAndActivate(p);
           await _billing.completePurchase(p);
         } else if (p.status == PurchaseStatus.error) {
+          final s = _ref.read(stringsProvider);
           state = state.copyWith(
             purchaseInProgress: false,
-            error: '购买失败：${p.error?.message ?? '未知错误'}',
+            error: s.purchaseFailed(p.error?.message ?? s.purchaseFailedUnknown),
           );
         }
       }
@@ -68,12 +70,13 @@ class BillingNotifier extends StateNotifier<BillingState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final products = await _billing.loadProducts();
+      final s = _ref.read(stringsProvider);
       if (products.isEmpty) {
         // Either Google Play is unavailable (emulator / no Play Store) or the
         // product IDs are not yet registered in Play Console.
         state = state.copyWith(
           isLoading: false,
-          error: 'Google Play 订阅服务不可用。请确认设备已安装 Play 商店，且订阅套餐已在 Play Console 配置。',
+          error: s.playUnavailable,
         );
         return;
       }
@@ -81,7 +84,8 @@ class BillingNotifier extends StateNotifier<BillingState> {
       products.sort((a, b) => a.id.compareTo(b.id));
       state = state.copyWith(isLoading: false, products: products);
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: '加载订阅信息失败，请检查网络后重试');
+      final s = _ref.read(stringsProvider);
+      state = state.copyWith(isLoading: false, error: s.loadPlansFailed);
     }
   }
 
@@ -90,8 +94,9 @@ class BillingNotifier extends StateNotifier<BillingState> {
     try {
       await _billing.buySubscription(product);
     } catch (e) {
+      final s = _ref.read(stringsProvider);
       state = state.copyWith(
-          purchaseInProgress: false, error: '无法发起购买，请稍后再试');
+          purchaseInProgress: false, error: s.launchPurchaseFailed);
     }
   }
 
@@ -102,12 +107,17 @@ class BillingNotifier extends StateNotifier<BillingState> {
 
   Future<void> _verifyAndActivate(PurchaseDetails p) async {
     try {
-      await _api.verifySubscription(p.purchaseID ?? '', p.productID);
+      final purchaseToken = p.verificationData.serverVerificationData;
+      if (purchaseToken.isEmpty) {
+        throw StateError('Missing Play purchase token');
+      }
+      await _api.verifySubscription(purchaseToken, p.productID);
       await _ref.read(authProvider.notifier).refreshUser();
       state = state.copyWith(purchaseInProgress: false);
     } catch (e) {
+      final s = _ref.read(stringsProvider);
       state = state.copyWith(
-          purchaseInProgress: false, error: '订阅验证失败，请联系客服');
+          purchaseInProgress: false, error: s.verifySubscriptionFailed);
     }
   }
 

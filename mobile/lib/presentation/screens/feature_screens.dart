@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../core/constants/api_constants.dart';
 import '../widgets/streaming_widget.dart';
 import '../widgets/content_plan_view.dart';
@@ -76,18 +77,19 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('脚本制作'),
+        title: Text(s.scriptTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_topicCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入视频主题')));
+                SnackBar(content: Text(s.pleaseEnterTopic)));
             return;
           }
           _saveHistory();
@@ -96,7 +98,7 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('生成脚本'),
+        label: Text(s.generateScript),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -106,42 +108,44 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
             if (_savedInput != null) _RestoreBar(onRestore: _restoreInput),
             TextFormField(
               controller: _topicCtrl,
-              decoration: const InputDecoration(
-                  labelText: '视频主题 *', hintText: '例如：如何在30天内减掉10斤'),
+              decoration: InputDecoration(
+                  labelText: s.topic, hintText: s.topicHint),
               maxLines: 2,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _type,
-              decoration: const InputDecoration(labelText: '视频类型'),
+              initialValue: _type,
+              decoration: InputDecoration(labelText: s.videoType),
               items: _types
-                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                  .map((t) => DropdownMenuItem(
+                      value: t, child: Text(s.videoTypeLabel(t))))
                   .toList(),
               onChanged: (v) => setState(() => _type = v!),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _style,
-              decoration: const InputDecoration(labelText: '内容风格'),
+              initialValue: _style,
+              decoration: InputDecoration(labelText: s.contentStyle),
               items: _styles
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .map((st) => DropdownMenuItem(
+                      value: st, child: Text(s.styleOptionLabel(st))))
                   .toList(),
               onChanged: (v) => setState(() => _style = v!),
             ),
             const SizedBox(height: 12),
-            Text('时长：$_duration 秒'),
+            Text(s.durationSeconds(_duration)),
             Slider(
               value: _duration.toDouble(),
               min: 15,
               max: 300,
               divisions: 19,
-              label: '$_duration秒',
+              label: s.durationSliderLabel(_duration),
               onChanged: (v) => setState(() => _duration = v.round()),
             ),
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '脚本制作',
+              title: s.scriptTitle,
               isAdmin: auth.isAdmin,
               onComplete: (text) => setState(() => _scriptResult = text),
               streamBuilder: (model) => api.streamPost(ApiConstants.script, {
@@ -152,7 +156,6 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
                 'model': model,
               }),
             ),
-            // 生成分镜拍摄表 — appears after script is generated
             if (_scriptResult.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 80),
@@ -160,7 +163,7 @@ class _ScriptScreenState extends ConsumerState<ScriptScreen> {
                   onPressed: () =>
                       context.go('/shot-table', extra: _scriptResult),
                   icon: const Icon(Icons.view_list_outlined),
-                  label: const Text('生成分镜拍摄表'),
+                  label: Text(s.generateShots),
                 ),
               ),
           ],
@@ -190,19 +193,20 @@ class _ShotTableScreenState extends ConsumerState<ShotTableScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('分镜拍摄表'),
+        title: Text(s.shotTableTitle),
       ),
       floatingActionButton: _parsedShots == null
           ? FloatingActionButton.extended(
               onPressed: () {
                 if (_scriptCtrl.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('请粘贴视频脚本')));
+                      SnackBar(content: Text(s.pleaseEnterScript)));
                   return;
                 }
                 FocusScope.of(context).unfocus();
@@ -210,7 +214,7 @@ class _ShotTableScreenState extends ConsumerState<ShotTableScreen> {
                     () { if (mounted) _streamKey.currentState?.start(); });
               },
               icon: const Icon(Icons.auto_awesome),
-              label: const Text('生成分镜表'),
+              label: Text(s.generateShots),
             )
           : null,
       body: SingleChildScrollView(
@@ -221,14 +225,14 @@ class _ShotTableScreenState extends ConsumerState<ShotTableScreen> {
             if (_parsedShots == null) ...[
               TextFormField(
                 controller: _scriptCtrl,
-                decoration: const InputDecoration(
-                    labelText: '视频脚本 *', hintText: '粘贴已生成的脚本内容'),
+                decoration: InputDecoration(
+                    labelText: s.scriptLabel, hintText: s.pasteScript),
                 maxLines: 6,
               ),
               const SizedBox(height: 16),
               StreamingWidget(
                 key: _streamKey,
-                title: '分镜拍摄表',
+                title: s.shotTableTitle,
                 isAdmin: auth.isAdmin,
                 streamBuilder: (model) =>
                     api.streamPost(ApiConstants.shotTable, {
@@ -248,7 +252,7 @@ class _ShotTableScreenState extends ConsumerState<ShotTableScreen> {
               OutlinedButton.icon(
                 onPressed: () => setState(() => _parsedShots = null),
                 icon: const Icon(Icons.refresh),
-                label: const Text('重新生成'),
+                label: Text(s.regenerate),
               ),
               const SizedBox(height: 80),
             ],
@@ -281,19 +285,20 @@ class _PositioningScreenState extends ConsumerState<PositioningScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('定位分析'),
+        title: Text(s.positioningTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_industryCtrl.text.trim().isEmpty ||
               _strengthsCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请填写行业领域和特长优势')));
+                SnackBar(content: Text(s.pleaseFillFields)));
             return;
           }
           FocusScope.of(context).unfocus();
@@ -301,7 +306,7 @@ class _PositioningScreenState extends ConsumerState<PositioningScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('开始分析'),
+        label: Text(s.analyzeBtn),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -310,23 +315,23 @@ class _PositioningScreenState extends ConsumerState<PositioningScreen> {
           children: [
             TextFormField(
               controller: _industryCtrl,
-              decoration: const InputDecoration(
-                  labelText: '行业领域 *', hintText: '例如：健身、美食、教育'),
+              decoration: InputDecoration(
+                  labelText: s.industry, hintText: s.industryHint),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _strengthsCtrl,
-              decoration: const InputDecoration(
-                  labelText: '特长优势 *', hintText: '例如：专业健身教练、10年经验'),
+              decoration: InputDecoration(
+                  labelText: s.strengths, hintText: s.strengthsHint),
               maxLines: 3,
             ),
             const SizedBox(height: 12),
-            const Text('目标平台', style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.platforms, style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               children: _platformOptions
                   .map((p) => FilterChip(
-                        label: Text(p),
+                        label: Text(s.platformOptionLabel(p)),
                         selected: _platforms.contains(p),
                         onSelected: (v) => setState(
                             () => v ? _platforms.add(p) : _platforms.remove(p)),
@@ -334,12 +339,12 @@ class _PositioningScreenState extends ConsumerState<PositioningScreen> {
                   .toList(),
             ),
             const SizedBox(height: 8),
-            const Text('内容形式', style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.contentFormats, style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               children: _formatOptions
                   .map((f) => FilterChip(
-                        label: Text(f),
+                        label: Text(s.contentFormatOptionLabel(f)),
                         selected: _contentFormats.contains(f),
                         onSelected: (v) => setState(() => v
                             ? _contentFormats.add(f)
@@ -350,7 +355,7 @@ class _PositioningScreenState extends ConsumerState<PositioningScreen> {
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '定位分析',
+              title: s.positioningTitle,
               isAdmin: auth.isAdmin,
               streamBuilder: (model) =>
                   api.streamPost(ApiConstants.positioning, {
@@ -433,18 +438,19 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('爆款选题'),
+        title: Text(s.viralTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_industryCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入赛道领域')));
+                SnackBar(content: Text(s.pleaseEnterTopic)));
             return;
           }
           _saveHistory();
@@ -453,7 +459,7 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('生成选题'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -463,34 +469,36 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
             if (_savedInput != null) _RestoreBar(onRestore: _restoreInput),
             TextFormField(
               controller: _industryCtrl,
-              decoration: const InputDecoration(
-                  labelText: '赛道领域 *', hintText: '例如：职场成长、健身减脂'),
+              decoration: InputDecoration(
+                  labelText: s.industry, hintText: s.industryHint),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _strengthsCtrl,
-              decoration: const InputDecoration(
-                  labelText: '特长优势（可选）', hintText: '例如：健身教练、10年经验'),
+              decoration: InputDecoration(
+                  labelText: s.optionalStrengths,
+                  hintText: s.strengthsHint),
               maxLines: 2,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _platform,
-              decoration: const InputDecoration(labelText: '目标平台'),
+              initialValue: _platform,
+              decoration: InputDecoration(labelText: s.platform),
               items: _platforms
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .map((p) => DropdownMenuItem(
+                      value: p, child: Text(s.platformOptionLabel(p))))
                   .toList(),
               onChanged: (v) => setState(() => _platform = v!),
             ),
             const SizedBox(height: 12),
-            const Text('内容方向（单选）',
-                style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.contentDirectionSingle,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               runSpacing: 4,
               children: _directions
                   .map((d) => ChoiceChip(
-                        label: Text(d),
+                        label: Text(s.viralDirectionLabel(d)),
                         selected: _contentDirection == d,
                         onSelected: (v) => setState(() =>
                             _contentDirection = v ? d : null),
@@ -498,14 +506,14 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
                   .toList(),
             ),
             const SizedBox(height: 12),
-            const Text('爆款元素（可多选）',
-                style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.viralElementsMulti,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               runSpacing: 4,
               children: _elements
                   .map((e) => FilterChip(
-                        label: Text(e),
+                        label: Text(s.viralElementLabel(e)),
                         selected: _viralElements.contains(e),
                         onSelected: (v) => setState(() =>
                             v ? _viralElements.add(e) : _viralElements.remove(e)),
@@ -515,7 +523,7 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '爆款选题',
+              title: s.viralTitle,
               isAdmin: auth.isAdmin,
               onComplete: (t) => setState(() => _topicsResult = t),
               streamBuilder: (model) =>
@@ -534,7 +542,7 @@ class _ViralTopicsScreenState extends ConsumerState<ViralTopicsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => context.go('/script'),
                   icon: const Icon(Icons.article_outlined),
-                  label: const Text('去制作脚本'),
+                  label: Text(s.viewScript),
                 ),
               ),
           ],
@@ -610,18 +618,19 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('变现选题'),
+        title: Text(s.monetizeTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_industryCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请输入赛道领域')));
+                SnackBar(content: Text(s.pleaseEnterTopic)));
             return;
           }
           _saveHistory();
@@ -630,7 +639,7 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('生成选题'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -640,33 +649,35 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
             if (_savedInput != null) _RestoreBar(onRestore: _restoreInput),
             TextFormField(
               controller: _industryCtrl,
-              decoration: const InputDecoration(labelText: '赛道领域 *'),
+              decoration: InputDecoration(labelText: s.industry),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _strengthsCtrl,
-              decoration: const InputDecoration(
-                  labelText: '特长优势（可选）', hintText: '例如：10年销售经验'),
+              decoration: InputDecoration(
+                  labelText: s.optionalStrengths,
+                  hintText: s.strengthsHint),
               maxLines: 2,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _followers,
-              decoration: const InputDecoration(labelText: '粉丝量'),
+              initialValue: _followers,
+              decoration: InputDecoration(labelText: s.followers),
               items: _followerRanges
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                  .map((r) => DropdownMenuItem(
+                      value: r, child: Text(s.followerRangeLabel(r))))
                   .toList(),
               onChanged: (v) => setState(() => _followers = v!),
             ),
             const SizedBox(height: 12),
-            const Text('变现方向（单选）',
-                style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.monetizeDirectionSingle,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               runSpacing: 4,
               children: _directions
                   .map((d) => ChoiceChip(
-                        label: Text(d),
+                        label: Text(s.monetizeDirectionLabel(d)),
                         selected: _monetizeDirection == d,
                         onSelected: (v) => setState(
                             () => _monetizeDirection = v ? d : null),
@@ -674,14 +685,14 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
                   .toList(),
             ),
             const SizedBox(height: 12),
-            const Text('内容基调（可多选）',
-                style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.contentToneMulti,
+                style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               runSpacing: 4,
               children: _toneOptions
                   .map((t) => FilterChip(
-                        label: Text(t),
+                        label: Text(s.toneOptionLabel(t)),
                         selected: _contentTone.contains(t),
                         onSelected: (v) => setState(() =>
                             v ? _contentTone.add(t) : _contentTone.remove(t)),
@@ -691,7 +702,7 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '变现选题',
+              title: s.monetizeTitle,
               isAdmin: auth.isAdmin,
               onComplete: (t) => setState(() => _topicsResult = t),
               streamBuilder: (model) =>
@@ -710,7 +721,7 @@ class _MonetizeTopicsScreenState extends ConsumerState<MonetizeTopicsScreen> {
                 child: OutlinedButton.icon(
                   onPressed: () => context.go('/script'),
                   icon: const Icon(Icons.article_outlined),
-                  label: const Text('去制作脚本'),
+                  label: Text(s.viewScript),
                 ),
               ),
           ],
@@ -736,18 +747,19 @@ class _RewriteScreenState extends ConsumerState<RewriteScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('文案二创'),
+        title: Text(s.rewriteTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_originalCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请粘贴原始文案')));
+                SnackBar(content: Text(s.pasteOriginalContentError)));
             return;
           }
           FocusScope.of(context).unfocus();
@@ -755,7 +767,7 @@ class _RewriteScreenState extends ConsumerState<RewriteScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('开始二创'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -764,14 +776,14 @@ class _RewriteScreenState extends ConsumerState<RewriteScreen> {
           children: [
             TextFormField(
               controller: _originalCtrl,
-              decoration: const InputDecoration(
-                  labelText: '原始文案 *', hintText: '粘贴要改写的视频文案'),
+              decoration: InputDecoration(
+                  labelText: s.originalContent, hintText: s.pasteContent),
               maxLines: 6,
             ),
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '文案二创',
+              title: s.rewriteTitle,
               isAdmin: auth.isAdmin,
               streamBuilder: (model) => api.streamPost(ApiConstants.rewrite, {
                 'original': _originalCtrl.text.trim(),
@@ -840,32 +852,36 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
   }
 
   void _selectSearchResult(Map<String, dynamic> r) {
+    final s = ref.read(stringsProvider);
     // Fill manual fields and switch to stream
     _titleCtrl.text = r['title'] as String? ?? '';
-    _contentCtrl.text =
-        '来源：${r['platform'] ?? ''}\n${r['snippet'] ?? ''}';
+    _contentCtrl.text = s.sourceSnippet(
+      (r['platform'] ?? '').toString(),
+      (r['snippet'] ?? '').toString(),
+    );
     setState(() => _mode = _BreakdownMode.manual);
   }
 
   void _generate() {
+    final s = ref.read(stringsProvider);
     FocusScope.of(context).unfocus();
     switch (_mode) {
       case _BreakdownMode.url:
         if (_urlCtrl.text.trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('请输入视频链接或分享文案')));
+              SnackBar(content: Text(s.pasteVideoLinkError)));
           return;
         }
       case _BreakdownMode.search:
         if (_titleCtrl.text.trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('请先搜索并选择一个视频')));
+              SnackBar(content: Text(s.chooseSearchVideoError)));
           return;
         }
       case _BreakdownMode.manual:
         if (_titleCtrl.text.trim().isEmpty) {
           ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('请输入视频标题')));
+              SnackBar(content: Text(s.enterVideoTitleError)));
           return;
         }
     }
@@ -878,17 +894,18 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
 
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('爆款拆解'),
+        title: Text(s.breakdownTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _generate,
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('开始拆解'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -897,19 +914,19 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
           children: [
             // Mode selector
             SegmentedButton<_BreakdownMode>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                     value: _BreakdownMode.url,
                     icon: Icon(Icons.link, size: 14),
-                    label: Text('链接解析', style: TextStyle(fontSize: 12))),
+                    label: Text(s.parseLinkMode, style: const TextStyle(fontSize: 12))),
                 ButtonSegment(
                     value: _BreakdownMode.search,
                     icon: Icon(Icons.search, size: 14),
-                    label: Text('搜索视频', style: TextStyle(fontSize: 12))),
+                    label: Text(s.searchVideoMode, style: const TextStyle(fontSize: 12))),
                 ButtonSegment(
                     value: _BreakdownMode.manual,
                     icon: Icon(Icons.edit_outlined, size: 14),
-                    label: Text('手动输入', style: TextStyle(fontSize: 12))),
+                    label: Text(s.manualInputMode, style: const TextStyle(fontSize: 12))),
               ],
               selected: {_mode},
               onSelectionChanged: (s) => setState(() => _mode = s.first),
@@ -920,15 +937,15 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
             if (_mode == _BreakdownMode.url) ...[
               TextFormField(
                 controller: _urlCtrl,
-                decoration: const InputDecoration(
-                  labelText: '视频链接或分享文案 *',
-                  hintText: '粘贴抖音/B站/小红书链接或分享文案',
+                decoration: InputDecoration(
+                  labelText: s.videoLinkOrShareText,
+                  hintText: s.pasteVideoLinkOrShareText,
                 ),
                 maxLines: 3,
               ),
               const SizedBox(height: 8),
               Text(
-                '支持：抖音、B站、小红书、视频号链接',
+                s.supportedPlatformsHint,
                 style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.outline),
@@ -941,14 +958,14 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _searchCtrl,
-                    decoration: const InputDecoration(
-                        labelText: '搜索关键词', hintText: '例如：减肥、副业赚钱'),
+                    decoration: InputDecoration(
+                        labelText: s.searchKeywordLabel, hintText: s.searchKeywordHint),
                     onFieldSubmitted: (_) => _searchVideos(),
                   ),
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                    onPressed: _searchVideos, child: const Text('搜索')),
+                    onPressed: _searchVideos, child: Text(s.searchNow)),
               ]),
               if (_searching)
                 const Padding(
@@ -978,7 +995,10 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 13)),
                     subtitle: Text(
-                        '${result['platform'] ?? ''} · ${result['view_count'] ?? ''}播放',
+                        s.platformViews(
+                          (result['platform'] ?? '').toString(),
+                          result['view_count'] ?? '',
+                        ),
                         style: const TextStyle(fontSize: 11)),
                     trailing: const Icon(Icons.chevron_right, size: 16),
                     onTap: () => _selectSearchResult(result),
@@ -991,14 +1011,13 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
             if (_mode == _BreakdownMode.manual) ...[
               TextFormField(
                 controller: _titleCtrl,
-                decoration:
-                    const InputDecoration(labelText: '视频标题 *'),
+                decoration: InputDecoration(labelText: s.videoTitle),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _contentCtrl,
-                decoration: const InputDecoration(
-                    labelText: '视频内容（可选）', hintText: '粘贴视频文案或内容描述'),
+                decoration: InputDecoration(
+                    labelText: s.videoContentOptional, hintText: s.pasteVideoContent),
                 maxLines: 4,
               ),
             ],
@@ -1008,7 +1027,7 @@ class _BreakdownScreenState extends ConsumerState<BreakdownScreen> {
             // Streaming output
             StreamingWidget(
               key: _streamKey,
-              title: '爆款拆解',
+              title: s.breakdownTitle,
               isAdmin: auth.isAdmin,
               streamBuilder: (model) {
                 if (_mode == _BreakdownMode.url) {
@@ -1054,19 +1073,20 @@ class _ImitateScreenState extends ConsumerState<ImitateScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('爆款仿写'),
+        title: Text(s.imitateTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_refTitleCtrl.text.trim().isEmpty ||
               _myTopicCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请填写参考视频标题和你的话题')));
+                SnackBar(content: Text(s.fillReferenceTopicError)));
             return;
           }
           FocusScope.of(context).unfocus();
@@ -1074,7 +1094,7 @@ class _ImitateScreenState extends ConsumerState<ImitateScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('开始仿写'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1083,45 +1103,44 @@ class _ImitateScreenState extends ConsumerState<ImitateScreen> {
           children: [
             TextFormField(
               controller: _refTitleCtrl,
-              decoration:
-                  const InputDecoration(labelText: '参考视频标题 *'),
+              decoration: InputDecoration(labelText: s.referenceVideoTitle),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _refContentCtrl,
-              decoration:
-                  const InputDecoration(labelText: '参考视频内容（可选）'),
+              decoration: InputDecoration(labelText: s.referenceVideoContent),
               maxLines: 3,
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _myTopicCtrl,
-              decoration: const InputDecoration(
-                  labelText: '我的话题 *', hintText: '例如：如何快速学会吉他'),
+              decoration: InputDecoration(
+                  labelText: s.myTopicLabel, hintText: s.myTopicHint),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _style,
-              decoration: const InputDecoration(labelText: '风格'),
+              initialValue: _style,
+              decoration: InputDecoration(labelText: s.styleLabel),
               items: _styles
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .map((style) => DropdownMenuItem(
+                      value: style, child: Text(s.styleOptionLabel(style))))
                   .toList(),
               onChanged: (v) => setState(() => _style = v!),
             ),
             const SizedBox(height: 12),
-            Text('时长：$_duration 秒'),
+            Text(s.durationSeconds(_duration)),
             Slider(
               value: _duration.toDouble(),
               min: 15,
               max: 300,
               divisions: 19,
-              label: '$_duration秒',
+              label: s.durationSliderLabel(_duration),
               onChanged: (v) => setState(() => _duration = v.round()),
             ),
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '爆款仿写',
+              title: s.imitateTitle,
               isAdmin: auth.isAdmin,
               onComplete: (text) => setState(() => _scriptResult = text),
               streamBuilder: (model) => api.streamPost(ApiConstants.imitate, {
@@ -1141,7 +1160,7 @@ class _ImitateScreenState extends ConsumerState<ImitateScreen> {
                   onPressed: () =>
                       context.go('/shot-table', extra: _scriptResult),
                   icon: const Icon(Icons.view_list_outlined),
-                  label: const Text('生成分镜拍摄表'),
+                  label: Text(s.generateShots),
                 ),
               ),
           ],
@@ -1166,9 +1185,10 @@ class _SearchViralScreenState extends ConsumerState<SearchViralScreen> {
   String? _error;
 
   Future<void> _search() async {
+    final s = ref.read(stringsProvider);
     if (_topicCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请输入搜索关键词')));
+          SnackBar(content: Text(s.enterSearchKeywordError)));
       return;
     }
     FocusScope.of(context).unfocus();
@@ -1196,12 +1216,13 @@ class _SearchViralScreenState extends ConsumerState<SearchViralScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('视频搜索'),
+        title: Text(s.searchTitle),
       ),
       body: Column(
         children: [
@@ -1211,13 +1232,13 @@ class _SearchViralScreenState extends ConsumerState<SearchViralScreen> {
               Expanded(
                 child: TextFormField(
                   controller: _topicCtrl,
-                  decoration: const InputDecoration(
-                      labelText: '搜索关键词', hintText: '例如：减肥、副业赚钱'),
+                  decoration: InputDecoration(
+                      labelText: s.searchKeywordLabel, hintText: s.searchKeywordHint),
                   onFieldSubmitted: (_) => _search(),
                 ),
               ),
               const SizedBox(width: 8),
-              FilledButton(onPressed: _search, child: const Text('搜索')),
+              FilledButton(onPressed: _search, child: Text(s.searchNow)),
             ]),
           ),
           if (_loading) const CircularProgressIndicator(),
@@ -1244,7 +1265,10 @@ class _SearchViralScreenState extends ConsumerState<SearchViralScreen> {
                     title: Text(r['title'] as String? ?? '',
                         maxLines: 2, overflow: TextOverflow.ellipsis),
                     subtitle: Text(
-                      '${r['platform'] ?? ''} · ${r['view_count'] ?? ''} 播放',
+                      s.platformViews(
+                        (r['platform'] ?? '').toString(),
+                        r['view_count'] ?? '',
+                      ),
                       style: const TextStyle(fontSize: 12),
                     ),
                   ),
@@ -1276,18 +1300,19 @@ class _BreakdownSharetextScreenState
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('分享拆解'),
+        title: Text(s.breakdownSharetextTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_sharetextCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请粘贴视频链接或分享文案')));
+                SnackBar(content: Text(s.pasteVideoLinkError)));
             return;
           }
           FocusScope.of(context).unfocus();
@@ -1295,7 +1320,7 @@ class _BreakdownSharetextScreenState
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('开始拆解'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1304,16 +1329,16 @@ class _BreakdownSharetextScreenState
           children: [
             TextFormField(
               controller: _sharetextCtrl,
-              decoration: const InputDecoration(
-                labelText: '视频链接或分享文案 *',
-                hintText: '粘贴抖音/B站/小红书视频链接或分享文案',
+              decoration: InputDecoration(
+                labelText: s.videoLinkOrShareText,
+                hintText: s.pasteVideoLinkOrShareText,
               ),
               maxLines: 4,
             ),
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '分享拆解',
+              title: s.breakdownSharetextTitle,
               isAdmin: auth.isAdmin,
               streamBuilder: (model) =>
                   api.streamPost(ApiConstants.breakdownSharetext, {
@@ -1350,19 +1375,20 @@ class _DirectorScreenState extends ConsumerState<DirectorScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('编导专栏'),
+        title: Text(s.directorTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           if (_topicCtrl.text.trim().isEmpty ||
               _sceneCtrl.text.trim().isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('请填写视频主题和拍摄场景')));
+                SnackBar(content: Text(s.fillTopicSceneError)));
             return;
           }
           FocusScope.of(context).unfocus();
@@ -1370,7 +1396,7 @@ class _DirectorScreenState extends ConsumerState<DirectorScreen> {
               () { if (mounted) _streamKey.currentState?.start(); });
         },
         icon: const Icon(Icons.auto_awesome),
-        label: const Text('生成建议'),
+        label: Text(s.generate),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1379,21 +1405,21 @@ class _DirectorScreenState extends ConsumerState<DirectorScreen> {
           children: [
             TextFormField(
               controller: _topicCtrl,
-              decoration: const InputDecoration(labelText: '视频主题 *'),
+              decoration: InputDecoration(labelText: s.videoTopic),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _sceneCtrl,
-              decoration: const InputDecoration(
-                  labelText: '拍摄场景 *', hintText: '例如：室内卧室、户外公园'),
+              decoration: InputDecoration(
+                  labelText: s.shootingScene, hintText: s.shootingSceneHint),
             ),
             const SizedBox(height: 12),
-            const Text('拍摄设备', style: TextStyle(fontWeight: FontWeight.w500)),
+            Text(s.shootingEquipment, style: const TextStyle(fontWeight: FontWeight.w500)),
             Wrap(
               spacing: 8,
               children: _equipmentOptions
                   .map((e) => FilterChip(
-                        label: Text(e),
+                        label: Text(s.equipmentOptionLabel(e)),
                         selected: _equipment.contains(e),
                         onSelected: (v) => setState(() =>
                             v ? _equipment.add(e) : _equipment.remove(e)),
@@ -1403,7 +1429,7 @@ class _DirectorScreenState extends ConsumerState<DirectorScreen> {
             const SizedBox(height: 16),
             StreamingWidget(
               key: _streamKey,
-              title: '编导专栏',
+              title: s.directorTitle,
               isAdmin: auth.isAdmin,
               streamBuilder: (model) =>
                   api.streamPost(ApiConstants.director, {
@@ -1477,6 +1503,7 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final api = ref.read(apiDataSourceProvider);
+    final s = ref.watch(stringsProvider);
     final streaming = _streamingChars > 0;
 
     return Scaffold(
@@ -1484,15 +1511,15 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('内容规划'),
+        title: Text(s.contentPlanTitle),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: streaming
-            ? null // disabled while generating
+            ? null
             : () {
                 if (_industryCtrl.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('请填写行业领域')));
+                      SnackBar(content: Text(s.fillIndustryError)));
                   return;
                 }
                 setState(() { _parsedPlan = null; _streamingChars = 0; });
@@ -1508,8 +1535,8 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
                     strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.calendar_month),
         label: Text(streaming
-            ? '生成中 $_streamingChars 字...'
-            : (_parsedPlan != null ? '重新生成' : '生成内容规划')),
+            ? s.streamingChars(_streamingChars)
+            : (_parsedPlan != null ? s.regenerate : s.contentPlanTitle)),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -1519,32 +1546,35 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
             TextFormField(
               controller: _industryCtrl,
               enabled: !streaming,
-              decoration: const InputDecoration(labelText: '行业领域 *'),
+              decoration: InputDecoration(labelText: s.industry),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _platform,
-              decoration: const InputDecoration(labelText: '目标平台'),
+              initialValue: _platform,
+              decoration: InputDecoration(labelText: s.platform),
               items: _platforms
-                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .map((p) => DropdownMenuItem(
+                      value: p, child: Text(s.platformOptionLabel(p))))
                   .toList(),
               onChanged: streaming ? null : (v) => setState(() => _platform = v!),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _followers,
-              decoration: const InputDecoration(labelText: '当前粉丝量'),
+              initialValue: _followers,
+              decoration: InputDecoration(labelText: s.followers),
               items: _followerRanges
-                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                  .map((r) => DropdownMenuItem(
+                      value: r, child: Text(s.followerRangeLabel(r))))
                   .toList(),
               onChanged: streaming ? null : (v) => setState(() => _followers = v!),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: _dailyHours,
-              decoration: const InputDecoration(labelText: '每日可用时间'),
+              initialValue: _dailyHours,
+              decoration: InputDecoration(labelText: s.dailyHours),
               items: _dailyHoursOptions
-                  .map((h) => DropdownMenuItem(value: h, child: Text(h)))
+                  .map((h) => DropdownMenuItem(
+                      value: h, child: Text(s.dailyHoursOptionLabel(h))))
                   .toList(),
               onChanged: streaming ? null : (v) => setState(() => _dailyHours = v!),
             ),
@@ -1554,7 +1584,7 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
             if (_parsedPlan == null)
               StreamingWidget(
                 key: _streamKey,
-                title: '内容规划',
+                title: s.contentPlanTitle,
                 isAdmin: auth.isAdmin,
                 onComplete: _onPlanComplete,
                 onProgress: (n) => setState(() => _streamingChars = n),
@@ -1584,12 +1614,13 @@ class _ContentPlanScreenState extends ConsumerState<ContentPlanScreen> {
 // Shown at the top of a form when a previous input snapshot is available.
 // Matches the web's "📋 使用上次输入" button pattern.
 
-class _RestoreBar extends StatelessWidget {
+class _RestoreBar extends ConsumerWidget {
   final VoidCallback onRestore;
   const _RestoreBar({required this.onRestore});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
@@ -1602,9 +1633,9 @@ class _RestoreBar extends StatelessWidget {
         ),
         onPressed: onRestore,
         icon: const Text('📋', style: TextStyle(fontSize: 15)),
-        label: const Text(
-          '使用上次输入',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        label: Text(
+          s.useLastInput,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );

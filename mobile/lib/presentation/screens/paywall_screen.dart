@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/billing_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../core/constants/app_constants.dart';
 
 class PaywallScreen extends ConsumerStatefulWidget {
@@ -14,6 +15,12 @@ class PaywallScreen extends ConsumerStatefulWidget {
 }
 
 class _PaywallScreenState extends ConsumerState<PaywallScreen> {
+  Future<void> _logout() async {
+    await ref.read(authProvider.notifier).logout();
+    if (!mounted) return;
+    context.go('/login');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -32,14 +39,14 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/home'));
     }
 
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('升级订阅'),
+        title: Text(s.upgradeTitle),
         actions: [
           TextButton(
-            onPressed: () => ref.read(authProvider.notifier).logout().then(
-                (_) => context.go('/login')),
-            child: const Text('退出登录'),
+            onPressed: _logout,
+            child: Text(s.logout),
           ),
         ],
       ),
@@ -51,25 +58,20 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
             Icon(Icons.workspace_premium,
                 size: 72, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 12),
-            Text('解锁全部AI创作功能',
+            Text(s.unlockAll,
                 style: Theme.of(context)
                     .textTheme
                     .headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('每天生成高质量短视频脚本、选题、分镜…',
+            Text(s.paywallSubtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey)),
+                style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 24),
 
             // Feature list
             ...[
-              '📝 脚本制作 & 分镜拍摄表',
-              '🎯 爆款选题 & 变现选题',
-              '🔍 多平台视频搜索',
-              '✍️ 文案二创 & 爆款仿写',
-              '📊 内容规划 & 定位分析',
-              '🎬 编导专栏',
+              s.feat1, s.feat2, s.feat3, s.feat4, s.feat5, s.feat6,
             ].map((f) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(children: [
@@ -95,13 +97,12 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
               const CircularProgressIndicator()
             else if (billing.products.isEmpty)
               Column(children: [
-                const Text('无法加载订阅信息，请检查网络',
-                    style: TextStyle(color: Colors.grey)),
+                Text(s.loadError, style: const TextStyle(color: Colors.grey)),
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () =>
                       ref.read(billingProvider.notifier).loadProducts(),
-                  child: const Text('重新加载'),
+                  child: Text(s.reload),
                 ),
               ])
             else
@@ -115,12 +116,12 @@ class _PaywallScreenState extends ConsumerState<PaywallScreen> {
                 : TextButton(
                     onPressed: () =>
                         ref.read(billingProvider.notifier).restore(),
-                    child: const Text('恢复已购订阅'),
+                    child: Text(s.restore),
                   ),
 
             const SizedBox(height: 8),
             Text(
-              '订阅将通过Google Play自动续费。取消订阅请前往Google Play设置。',
+              s.autoRenewNote,
               textAlign: TextAlign.center,
               style: Theme.of(context)
                   .textTheme
@@ -142,7 +143,9 @@ class _ProductCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isPro = product.id == AppConstants.productPro;
     final billing = ref.watch(billingProvider);
+    final s = ref.watch(stringsProvider);
     final limit = AppConstants.dailyLimits[isPro ? 'pro' : 'pro_plus'] ?? (isPro ? 30 : 90);
+    final tierLabel = isPro ? s.tierPro : s.tierProPlus;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -153,7 +156,7 @@ class _ProductCard extends ConsumerWidget {
           children: [
             Row(children: [
               Text(
-                isPro ? 'Pro版' : 'Pro+版',
+                tierLabel,
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
@@ -164,22 +167,21 @@ class _ProductCard extends ConsumerWidget {
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.bold)),
-              Text('/月',
+              Text(s.perMonth,
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
                       ?.copyWith(color: Colors.grey)),
             ]),
             const SizedBox(height: 4),
-            Text('每天可生成 $limit 次',
-                style: const TextStyle(color: Colors.grey)),
+            Text(s.timesPerDayN(limit), style: const TextStyle(color: Colors.grey)),
             const SizedBox(height: 12),
             billing.purchaseInProgress
                 ? const Center(child: CircularProgressIndicator())
                 : FilledButton(
                     onPressed: () =>
                         ref.read(billingProvider.notifier).buy(product),
-                    child: Text('订阅${isPro ? 'Pro版' : 'Pro+版'}'),
+                    child: Text(s.subscribeTo(tierLabel)),
                   ),
           ],
         ),

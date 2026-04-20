@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/api_constants.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 
 class HotTrendsScreen extends ConsumerStatefulWidget {
   const HotTrendsScreen({super.key});
@@ -37,8 +38,8 @@ class _HotTrendsScreenState extends ConsumerState<HotTrendsScreen> {
       });
       setState(() {
         _data = (data['data'] as List?) ?? [];
-        _ts = data['ts'] as String?;
-        _error = data['error'] as String?;
+        _ts = data['ts'] != null ? data['ts'].toString() : null;
+        _error = data['error'] != null ? data['error'].toString() : null;
         _loading = false;
       });
     } catch (e) {
@@ -57,7 +58,7 @@ class _HotTrendsScreenState extends ConsumerState<HotTrendsScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/home')),
-        title: const Text('热点追踪'),
+        title: Text(ref.watch(stringsProvider).hotTrendsTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -91,7 +92,7 @@ class _HotTrendsScreenState extends ConsumerState<HotTrendsScreen> {
               child: Row(children: [
                 const Icon(Icons.schedule, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text('更新于 $_ts',
+                Text('${ref.watch(stringsProvider).updatedAt} $_ts',
                     style: const TextStyle(fontSize: 12, color: Colors.grey)),
               ]),
             ),

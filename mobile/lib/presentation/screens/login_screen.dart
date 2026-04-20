@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -46,6 +47,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final s = ref.watch(stringsProvider);
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -61,25 +63,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       color: Theme.of(context).colorScheme.primary),
                   const SizedBox(height: 12),
                   Text(
-                    '短视频创作助手',
+                    s.appName,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                   const SizedBox(height: 8),
-                  Text('登录您的账号',
+                  Text(s.loginTitle,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.grey,
                           )),
                   const SizedBox(height: 32),
                   TextFormField(
                     controller: _userCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '用户名',
-                      prefixIcon: Icon(Icons.person_outline),
+                    decoration: InputDecoration(
+                      labelText: s.username,
+                      prefixIcon: const Icon(Icons.person_outline),
                     ),
                     validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? '请输入用户名' : null,
+                        (v == null || v.trim().isEmpty) ? s.usernameHint : null,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
@@ -87,7 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     controller: _passCtrl,
                     obscureText: _obscure,
                     decoration: InputDecoration(
-                      labelText: '密码',
+                      labelText: s.password,
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
@@ -96,7 +98,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                     validator: (v) =>
-                        (v == null || v.isEmpty) ? '请输入密码' : null,
+                        (v == null || v.isEmpty) ? s.passwordHint : null,
                     onFieldSubmitted: (_) => _login(),
                   ),
                   const SizedBox(height: 24),
@@ -104,11 +106,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ? const CircularProgressIndicator()
                       : FilledButton(
                           onPressed: _login,
-                          child: const Text('登 录'),
+                          child: Text(s.loginBtn),
                         ),
                   const SizedBox(height: 24),
                   Text(
-                    '没有账号？请联系管理员开通',
+                    s.noAccount,
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall

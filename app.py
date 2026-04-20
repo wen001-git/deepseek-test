@@ -49,6 +49,7 @@ def require_login():
                     session['user_id'] = user['id']
                     session['username'] = user['username']
                     session['role'] = user['role']
+                    session['client_platform'] = 'android'
         except Exception:
             pass
 
@@ -67,9 +68,11 @@ def ping():
 def stream_response(system_prompt, user_prompt, model):
     user_id = session.get('user_id')
     role = session.get('role', 'user')
-    allowed, quota_error = check_and_increment_quota(user_id, role)
-    if not allowed:
-        return jsonify({'error': quota_error}), 429
+    # Daily quota only applies to Android app users; web (PC/mobile browser) users are unrestricted
+    if session.get('client_platform') == 'android':
+        allowed, quota_error = check_and_increment_quota(user_id, role)
+        if not allowed:
+            return jsonify({'error': quota_error}), 429
 
     is_admin = role == 'admin'
     def generate():

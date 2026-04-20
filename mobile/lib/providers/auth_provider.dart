@@ -2,6 +2,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/datasources/api_data_source.dart';
 import '../data/datasources/local_data_source.dart';
+import 'locale_provider.dart';
 
 // ── Shared datasource providers ──────────────────────────────────────────────
 
@@ -54,8 +55,9 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiDataSource _api;
   final LocalDataSource _local;
+  final Ref _ref;
 
-  AuthNotifier(this._api, this._local) : super(const AuthState());
+  AuthNotifier(this._api, this._local, this._ref) : super(const AuthState());
 
   Future<void> init() async {
     try {
@@ -120,6 +122,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _parseError(dynamic e) {
+    final strings = _ref.read(stringsProvider);
     final str = e.toString();
     // Extract message from DioException
     if (str.contains('"error"')) {
@@ -129,7 +132,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (str.contains('Exception:')) {
       return str.split('Exception:').last.trim();
     }
-    return '登录失败，请检查网络连接';
+    return strings.signInFailedNetwork;
   }
 }
 
@@ -137,5 +140,6 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier(
     ref.read(apiDataSourceProvider),
     ref.read(localDataSourceProvider),
+    ref,
   );
 });

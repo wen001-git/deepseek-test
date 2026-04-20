@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../core/constants/app_constants.dart';
+import '../../providers/locale_provider.dart';
 
 class _NavItem {
   final String route;
@@ -11,21 +11,6 @@ class _NavItem {
   final bool adminOnly;
   const _NavItem(this.route, this.icon, this.label, {this.adminOnly = false});
 }
-
-// Grid matches the web sidebar exactly:
-// 账号规划(workflow), 爆款选题, 变现选题, 脚本制作, 文案二创,
-// 爆款拆解, 爆款仿写, 编导专栏, 热点追踪(admin)
-const _items = [
-  _NavItem('/account-planning', Icons.route_outlined, '账号规划'),
-  _NavItem('/viral-topics', Icons.trending_up, '爆款选题'),
-  _NavItem('/monetize-topics', Icons.monetization_on_outlined, '变现选题'),
-  _NavItem('/script', Icons.article_outlined, '脚本制作'),
-  _NavItem('/rewrite', Icons.edit_note, '文案二创'),
-  _NavItem('/breakdown', Icons.analytics_outlined, '爆款拆解'),
-  _NavItem('/imitate', Icons.copy_outlined, '爆款仿写'),
-  _NavItem('/director', Icons.movie_creation_outlined, '编导专栏'),
-  _NavItem('/hot-trends', Icons.whatshot_outlined, '热点追踪', adminOnly: true),
-];
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -39,33 +24,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final visibleItems = _items.where((i) => !i.adminOnly || auth.isAdmin).toList();
-    final titles = ['短视频创作助手', '我的账号'];
+    final s = ref.watch(stringsProvider);
+    final allItems = [
+      _NavItem('/account-planning', Icons.route_outlined, s.accountPlanning),
+      _NavItem('/viral-topics', Icons.trending_up, s.viralTopics),
+      _NavItem('/monetize-topics', Icons.monetization_on_outlined, s.monetizeTopics),
+      _NavItem('/script', Icons.article_outlined, s.scriptWriting),
+      _NavItem('/rewrite', Icons.edit_note, s.contentRewrite),
+      _NavItem('/breakdown', Icons.analytics_outlined, s.breakdown),
+      _NavItem('/imitate', Icons.copy_outlined, s.imitate),
+      _NavItem('/director', Icons.movie_creation_outlined, s.director),
+      _NavItem('/hot-trends', Icons.whatshot_outlined, s.hotTrends, adminOnly: true),
+    ];
+    final visibleItems = allItems.where((i) => !i.adminOnly || auth.isAdmin).toList();
+    final titles = [s.appName, s.myAccountTitle];
 
     return Scaffold(
       appBar: AppBar(title: Text(titles[_tab])),
       body: IndexedStack(
         index: _tab,
         children: [
-          // Tab 0: 14-feature grid
           _FeaturesGrid(items: visibleItems),
-          // Tab 1: Profile
           _ProfileTab(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.apps_outlined),
-            selectedIcon: Icon(Icons.apps),
-            label: '工具箱',
+            icon: const Icon(Icons.apps_outlined),
+            selectedIcon: const Icon(Icons.apps),
+            label: s.toolbox,
           ),
           NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: '我的',
+            icon: const Icon(Icons.person_outline),
+            selectedIcon: const Icon(Icons.person),
+            label: s.myTab,
           ),
         ],
       ),
@@ -128,7 +123,8 @@ class _ProfileTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
-    final tierName = AppConstants.tierNames[auth.tier] ?? auth.tier;
+    final s = ref.watch(stringsProvider);
+    final tierName = s.tierName(auth.tier);
     final dailyLimit = auth.dailyLimit;
 
     return ListView(
@@ -159,26 +155,37 @@ class _ProfileTab extends ConsumerWidget {
         const SizedBox(height: 24),
         Card(
           child: Column(children: [
-            _InfoTile(label: '账号类型', value: auth.role == 'admin' ? '管理员' : '普通用户'),
+            _InfoTile(label: s.accountType, value: auth.role == 'admin' ? s.adminRole : s.normalUser),
             const Divider(height: 1),
             _InfoTile(
-                label: '订阅套餐',
+                label: s.subscription,
                 value: tierName,
                 valueColor: Theme.of(context).colorScheme.primary),
             const Divider(height: 1),
-            _InfoTile(label: '每日生成次数', value: '$dailyLimit 次'),
+            _InfoTile(label: s.dailyLimit, value: s.timesPerDay(dailyLimit)),
             if (auth.expiresAt != null) ...[
               const Divider(height: 1),
-              _InfoTile(label: '到期时间', value: auth.expiresAt!),
+              _InfoTile(label: s.expiresAt, value: auth.expiresAt!),
             ],
           ]),
+        ),
+        const SizedBox(height: 16),
+        // Language toggle
+        Card(
+          child: SwitchListTile(
+            title: Text(s.language),
+            subtitle: Text(s.isZh ? s.chinese : s.english),
+            secondary: const Icon(Icons.language),
+            value: s.isZh,
+            onChanged: (_) => ref.read(localeProvider.notifier).toggle(),
+          ),
         ),
         const SizedBox(height: 16),
         if (auth.tier == 'free' && !auth.isAdmin)
           FilledButton.icon(
             onPressed: () => context.go('/paywall'),
             icon: const Icon(Icons.workspace_premium),
-            label: const Text('升级订阅'),
+            label: Text(s.upgradeBtn),
           ),
         const SizedBox(height: 16),
         OutlinedButton.icon(
@@ -187,7 +194,7 @@ class _ProfileTab extends ConsumerWidget {
             if (context.mounted) context.go('/login');
           },
           icon: const Icon(Icons.logout),
-          label: const Text('退出登录'),
+          label: Text(s.logout),
           style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
         ),
       ],

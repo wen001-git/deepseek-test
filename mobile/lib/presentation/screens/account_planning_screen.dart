@@ -15,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../core/constants/api_constants.dart';
 import '../widgets/streaming_widget.dart';
 import '../widgets/content_plan_view.dart';
@@ -129,7 +130,7 @@ class _AccountPlanningScreenState
     if (_industryCtrl.text.trim().isEmpty ||
         _strengthsCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请填写行业领域和特长优势')));
+          SnackBar(content: Text(ref.read(stringsProvider).pleaseFillFields)));
       return;
     }
     _saveHistory();
@@ -188,7 +189,7 @@ class _AccountPlanningScreenState
     if (_cpIndustryCtrl.text.trim().isEmpty ||
         _cpPlatform.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请填写行业领域和目标平台')));
+          SnackBar(content: Text(ref.read(stringsProvider).pleaseFillIndustryPlatform)));
       return;
     }
     setState(() { _step2Plan = null; _step2StreamingChars = 0; });
@@ -220,6 +221,7 @@ class _AccountPlanningScreenState
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final s = ref.watch(stringsProvider);
     final api = ref.read(apiDataSourceProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -228,7 +230,7 @@ class _AccountPlanningScreenState
         leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/home')),
-        title: const Text('账号规划工作流'),
+        title: Text(s.accountPlanningTitle),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -236,16 +238,21 @@ class _AccountPlanningScreenState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // ── Stepper ─────────────────────────────────────────────────
-            _WorkflowStepper(step1Done: _step1Done, step2Done: _step2Done),
+            _WorkflowStepper(
+              step1Done: _step1Done,
+              step2Done: _step2Done,
+              step1Label: s.step1Label,
+              step2Label: s.step2Label,
+            ),
             const SizedBox(height: 20),
 
             // ════════════════════════════════════════════════════════════
-            // STEP 1 — 定位分析
+            // STEP 1 — Positioning Analysis
             // ════════════════════════════════════════════════════════════
             _StepCard(
               stepNumber: 1,
-              title: '定位分析',
-              subtitle: '分析账号定位、目标人群和内容方向',
+              title: s.step1Label,
+              subtitle: s.step1Subtitle,
               isDone: _step1Done,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -254,56 +261,60 @@ class _AccountPlanningScreenState
                     _RestoreBar(onRestore: _restoreInput),
                   TextFormField(
                     controller: _industryCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '行业领域 *',
-                      hintText: '例如：健身、美食、教育、时尚',
+                    decoration: InputDecoration(
+                      labelText: s.industry,
+                      hintText: s.industryHint,
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _strengthsCtrl,
-                    decoration: const InputDecoration(
-                      labelText: '特长优势 *',
-                      hintText: '例如：专业健身教练，10年从业经验',
+                    decoration: InputDecoration(
+                      labelText: s.strengths,
+                      hintText: s.strengthsHint,
                     ),
                     maxLines: 3,
                   ),
                   const SizedBox(height: 12),
                   _ChipGroup(
-                    label: '账号类型',
+                    label: s.accountTypeOpts,
                     options: _accountTypeOptions,
                     selected: _accountTypes,
                     multiSelect: true,
+                    labelBuilder: s.accountTypeOptionLabel,
                     onChanged: (v) => setState(() => _accountTypes = v),
                   ),
                   const SizedBox(height: 8),
                   _ChipGroup(
-                    label: '内容风格偏好',
+                    label: s.contentStylePref,
                     options: _contentStyleOptions,
                     selected: _contentStyles,
                     multiSelect: true,
+                    labelBuilder: s.contentStyleOptionLabel,
                     onChanged: (v) => setState(() => _contentStyles = v),
                   ),
                   const SizedBox(height: 8),
                   _ChipGroup(
-                    label: '内容形式偏好',
+                    label: s.contentFormatPref,
                     options: _contentFormatOptions,
                     selected: _contentFormats,
                     multiSelect: true,
+                    labelBuilder: s.contentFormatOptionLabel,
                     onChanged: (v) => setState(() => _contentFormats = v),
                   ),
                   const SizedBox(height: 8),
                   _ChipGroup(
-                    label: '目标平台',
+                    label: s.targetPlatform,
                     options: _platformOptions,
                     selected: _platforms,
                     multiSelect: true,
+                    labelBuilder: s.platformOptionLabel,
                     onChanged: (v) => setState(() => _platforms = v),
                   ),
                   const SizedBox(height: 16),
                   StreamingWidget(
                     key: _step1Key,
-                    title: '定位分析',
+                    title: s.step1Label,
                     isAdmin: auth.isAdmin,
                     onComplete: _onStep1Complete,
                     streamBuilder: (model) =>
@@ -323,13 +334,13 @@ class _AccountPlanningScreenState
                       child: OutlinedButton.icon(
                         onPressed: () => context.go('/script'),
                         icon: const Icon(Icons.article_outlined),
-                        label: const Text('去制作脚本'),
+                        label: Text(s.makeScript),
                       ),
                     ),
                   FilledButton.icon(
                     onPressed: _submitStep1,
                     icon: const Icon(Icons.auto_awesome),
-                    label: const Text('开始定位分析'),
+                    label: Text(s.startPositioning),
                   ),
                 ],
               ),
@@ -338,13 +349,13 @@ class _AccountPlanningScreenState
             const SizedBox(height: 16),
 
             // ════════════════════════════════════════════════════════════
-            // STEP 2 — 内容规划 (locked until step 1 completes)
+            // STEP 2 — Content Plan (locked until step 1 completes)
             // ════════════════════════════════════════════════════════════
             _StepCard(
               key: _step2CardKey,
               stepNumber: 2,
-              title: '内容规划',
-              subtitle: '基于定位分析结果，制定内容发布计划',
+              title: s.step2Label,
+              subtitle: s.step2Subtitle,
               isDone: _step2Done,
               locked: !_step1Done,
               child: Column(
@@ -353,28 +364,30 @@ class _AccountPlanningScreenState
                   TextFormField(
                     controller: _cpIndustryCtrl,
                     enabled: _step1Done,
-                    decoration: const InputDecoration(
-                      labelText: '行业领域',
-                      hintText: '自动填入（来自步骤一）',
+                    decoration: InputDecoration(
+                      labelText: s.industry,
+                      hintText: s.industryAutoFill,
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: _cpAudienceCtrl,
                     enabled: _step1Done,
-                    decoration: const InputDecoration(
-                      labelText: '目标受众',
-                      hintText: '自动提取（来自定位分析结果）',
+                    decoration: InputDecoration(
+                      labelText: s.targetAudience,
+                      hintText: s.audienceAutoFill,
                     ),
                     maxLines: 2,
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _cpPlatform,
-                    decoration: const InputDecoration(labelText: '目标平台'),
+                    initialValue: _cpPlatform,
+                    decoration: InputDecoration(labelText: s.targetPlatform),
                     items: _cpPlatforms
                         .map((p) =>
-                            DropdownMenuItem(value: p, child: Text(p)))
+                            DropdownMenuItem(
+                                value: p,
+                                child: Text(s.platformOptionLabel(p))))
                         .toList(),
                     onChanged: _step1Done
                         ? (v) => setState(() => _cpPlatform = v!)
@@ -382,11 +395,13 @@ class _AccountPlanningScreenState
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _cpFollowers,
-                    decoration: const InputDecoration(labelText: '当前粉丝量'),
+                    initialValue: _cpFollowers,
+                    decoration: InputDecoration(labelText: s.currentFollowers),
                     items: _cpFollowerRanges
                         .map((r) =>
-                            DropdownMenuItem(value: r, child: Text(r)))
+                            DropdownMenuItem(
+                                value: r,
+                                child: Text(s.followerRangeLabel(r))))
                         .toList(),
                     onChanged: _step1Done
                         ? (v) => setState(() => _cpFollowers = v!)
@@ -394,11 +409,13 @@ class _AccountPlanningScreenState
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _cpDailyHours,
-                    decoration: const InputDecoration(labelText: '每日可用时间'),
+                    initialValue: _cpDailyHours,
+                    decoration: InputDecoration(labelText: s.dailyHours),
                     items: _cpDailyHoursOptions
                         .map((h) =>
-                            DropdownMenuItem(value: h, child: Text(h)))
+                            DropdownMenuItem(
+                                value: h,
+                                child: Text(s.dailyHoursOptionLabel(h))))
                         .toList(),
                     onChanged: _step1Done
                         ? (v) => setState(() => _cpDailyHours = v!)
@@ -409,7 +426,7 @@ class _AccountPlanningScreenState
                     if (_step2Plan == null)
                       StreamingWidget(
                         key: _step2Key,
-                        title: '内容规划',
+                        title: s.step2Label,
                         isAdmin: auth.isAdmin,
                         onComplete: _onStep2Complete,
                         onProgress: (n) =>
@@ -437,8 +454,8 @@ class _AccountPlanningScreenState
                                   strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.calendar_month),
                       label: Text(_step2StreamingChars > 0
-                          ? '生成中 $_step2StreamingChars 字...'
-                          : (_step2Plan != null ? '重新生成' : '生成内容规划')),
+                          ? s.generatingChars(_step2StreamingChars)
+                          : (_step2Plan != null ? s.regenerate : s.generateContentPlan)),
                     ),
                   ] else
                     Padding(
@@ -449,7 +466,7 @@ class _AccountPlanningScreenState
                           Icon(Icons.lock_outline,
                               color: colorScheme.outline, size: 16),
                           const SizedBox(width: 6),
-                          Text('完成步骤一后解锁',
+                          Text(s.unlockAfterStep1,
                               style: TextStyle(color: colorScheme.outline)),
                         ],
                       ),
@@ -471,20 +488,27 @@ class _AccountPlanningScreenState
 class _WorkflowStepper extends StatelessWidget {
   final bool step1Done;
   final bool step2Done;
-  const _WorkflowStepper({required this.step1Done, required this.step2Done});
+  final String step1Label;
+  final String step2Label;
+  const _WorkflowStepper({
+    required this.step1Done,
+    required this.step2Done,
+    required this.step1Label,
+    required this.step2Label,
+  });
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     return Row(children: [
-      _StepCircle(number: 1, done: step1Done, active: !step1Done),
+      _StepCircle(number: 1, done: step1Done, active: !step1Done, label: step1Label),
       Expanded(
         child: Container(
           height: 2,
           color: step1Done ? primary : Colors.grey.shade300,
         ),
       ),
-      _StepCircle(number: 2, done: step2Done, active: step1Done),
+      _StepCircle(number: 2, done: step2Done, active: step1Done, label: step2Label),
     ]);
   }
 }
@@ -493,8 +517,13 @@ class _StepCircle extends StatelessWidget {
   final int number;
   final bool done;
   final bool active;
-  const _StepCircle(
-      {required this.number, required this.done, required this.active});
+  final String label;
+  const _StepCircle({
+    required this.number,
+    required this.done,
+    required this.active,
+    required this.label,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -523,7 +552,7 @@ class _StepCircle extends StatelessWidget {
       ),
       const SizedBox(height: 4),
       Text(
-        number == 1 ? '定位分析' : '内容规划',
+        label,
         style: TextStyle(
             fontSize: 11,
             color: (done || active) ? primary : Colors.grey,
@@ -620,6 +649,7 @@ class _ChipGroup extends StatelessWidget {
   final List<String> selected;
   final bool multiSelect;
   final void Function(List<String>) onChanged;
+  final String Function(String)? labelBuilder;
 
   const _ChipGroup({
     required this.label,
@@ -627,6 +657,7 @@ class _ChipGroup extends StatelessWidget {
     required this.selected,
     required this.multiSelect,
     required this.onChanged,
+    this.labelBuilder,
   });
 
   @override
@@ -642,7 +673,8 @@ class _ChipGroup extends StatelessWidget {
         children: options.map((opt) {
           final isSelected = selected.contains(opt);
           return FilterChip(
-            label: Text(opt, style: const TextStyle(fontSize: 12)),
+            label: Text(labelBuilder?.call(opt) ?? opt,
+                style: const TextStyle(fontSize: 12)),
             selected: isSelected,
             onSelected: (v) {
               final next = List<String>.from(selected);
@@ -667,12 +699,13 @@ class _ChipGroup extends StatelessWidget {
 
 // ── Restore-bar widget ────────────────────────────────────────────────────────
 
-class _RestoreBar extends StatelessWidget {
+class _RestoreBar extends ConsumerWidget {
   final VoidCallback onRestore;
   const _RestoreBar({required this.onRestore});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(stringsProvider);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: OutlinedButton.icon(
@@ -685,9 +718,9 @@ class _RestoreBar extends StatelessWidget {
         ),
         onPressed: onRestore,
         icon: const Text('📋', style: TextStyle(fontSize: 15)),
-        label: const Text(
-          '使用上次输入',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        label: Text(
+          s.useLastInput,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );

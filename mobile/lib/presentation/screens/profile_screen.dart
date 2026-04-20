@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../core/constants/app_constants.dart';
+import '../../providers/locale_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -10,11 +10,15 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
-    final tierName = AppConstants.tierNames[auth.tier] ?? auth.tier;
+    final s = ref.watch(stringsProvider);
+    final tierName = s.tierName(auth.tier);
     final dailyLimit = auth.dailyLimit;
 
     return Scaffold(
-      appBar: AppBar(leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/home')), title: const Text('我的账号')),
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/home')),
+        title: Text(s.myAccountTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -43,17 +47,29 @@ class ProfileScreen extends ConsumerWidget {
           // Info card
           Card(
             child: Column(children: [
-              _InfoTile(label: '账号类型', value: auth.role == 'admin' ? '管理员' : '普通用户'),
+              _InfoTile(label: s.accountType, value: auth.role == 'admin' ? s.adminRole : s.normalUser),
               const Divider(height: 1),
-              _InfoTile(label: '订阅套餐', value: tierName,
+              _InfoTile(label: s.subscription, value: tierName,
                   valueColor: Theme.of(context).colorScheme.primary),
               const Divider(height: 1),
-              _InfoTile(label: '每日生成次数', value: '$dailyLimit 次'),
+              _InfoTile(label: s.dailyLimit, value: s.timesPerDay(dailyLimit)),
               if (auth.expiresAt != null) ...[
                 const Divider(height: 1),
-                _InfoTile(label: '到期时间', value: auth.expiresAt!),
+                _InfoTile(label: s.expiresAt, value: auth.expiresAt!),
               ],
             ]),
+          ),
+          const SizedBox(height: 16),
+
+          // Language toggle
+          Card(
+            child: SwitchListTile(
+              title: Text(s.language),
+              subtitle: Text(s.isZh ? s.chinese : s.english),
+              secondary: const Icon(Icons.language),
+              value: s.isZh,
+              onChanged: (_) => ref.read(localeProvider.notifier).toggle(),
+            ),
           ),
           const SizedBox(height: 16),
 
@@ -62,7 +78,7 @@ class ProfileScreen extends ConsumerWidget {
             FilledButton.icon(
               onPressed: () => context.push('/paywall'),
               icon: const Icon(Icons.workspace_premium),
-              label: const Text('升级订阅'),
+              label: Text(s.upgradeBtn),
             ),
 
           const SizedBox(height: 16),
@@ -74,7 +90,7 @@ class ProfileScreen extends ConsumerWidget {
               if (context.mounted) context.go('/login');
             },
             icon: const Icon(Icons.logout),
-            label: const Text('退出登录'),
+            label: Text(s.logout),
             style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
           ),
         ],

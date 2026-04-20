@@ -1,15 +1,24 @@
 import java.util.Properties
+import org.gradle.api.GradleException
 
 // ---------------------------------------------------------------------------
-// Release signing — conditional on key.properties existing.
-// During development (no key.properties) release falls back to debug signing.
+// Release signing — release builds must use a real upload key.
 // See android/key.properties.template for setup instructions.
 // ---------------------------------------------------------------------------
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
 val hasKeystore = keystorePropertiesFile.exists()
+val isReleaseBuild = gradle.startParameter.taskNames.any {
+    it.contains("release", ignoreCase = true)
+}
 if (hasKeystore) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
+} else if (isReleaseBuild) {
+    throw GradleException(
+        "Release signing requires android/key.properties. " +
+            "Copy android/key.properties.template to android/key.properties " +
+            "and fill in your real keystore credentials before building a release."
+    )
 }
 
 plugins {
@@ -44,25 +53,17 @@ android {
     signingConfigs {
         create("release") {
             if (hasKeystore) {
-                // TODO [RELEASE]: Populate key.properties before Play Store submission.
-                // See android/key.properties.template for the required fields.
                 storeFile     = file(keystoreProperties["storeFile"]     as String)
                 storePassword = keystoreProperties["storePassword"]      as String
                 keyAlias      = keystoreProperties["keyAlias"]           as String
                 keyPassword   = keystoreProperties["keyPassword"]        as String
             }
-            // key.properties absent → block stays empty; release falls back to debug below
         }
     }
 
     buildTypes {
         release {
-            // Uses real release signing when key.properties exists; debug keys otherwise.
-            // TODO [RELEASE]: Remove the else branch once keystore is configured.
-            signingConfig = if (hasKeystore)
-                signingConfigs.getByName("release")
-            else
-                signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

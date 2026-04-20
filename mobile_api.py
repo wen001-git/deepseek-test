@@ -4,7 +4,7 @@ JWT-based auth endpoints for the Flutter Android app.
 Web routes and admin panel are completely unaffected.
 """
 import os
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from flask import Blueprint, request, jsonify, g
 from werkzeug.security import check_password_hash
 
@@ -17,13 +17,24 @@ from mobile_auth import create_mobile_token, mobile_auth_required
 
 mobile_bp = Blueprint('mobile', __name__, url_prefix='/api/mobile')
 
-PLAY_PACKAGE_NAME = os.getenv('GOOGLE_PLAY_PACKAGE_NAME', '')
-GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON', '')
-
 PRODUCT_TO_TIER = {
     'creator_pro_monthly': 'pro',
     'creator_pro_plus_monthly': 'pro_plus',
 }
+
+
+def _play_package_name():
+    return os.getenv('GOOGLE_PLAY_PACKAGE_NAME', '').strip()
+
+
+def _play_service_account_json():
+    return os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON', '').strip()
+
+
+def _allow_play_dev_bypass():
+    return os.getenv('ALLOW_PLAY_SUBSCRIPTION_DEV_BYPASS', '').strip().lower() in {
+        '1', 'true', 'yes'
+    }
 
 
 def _get_client_ip():
@@ -142,29 +153,39 @@ def mobile_verify_subscription():
 
 def _verify_play_subscription(purchase_token: str, product_id: str):
     """Call Google Play Developer API to verify a subscription purchase."""
-    if not GOOGLE_SERVICE_ACCOUNT_JSON or not PLAY_PACKAGE_NAME:
-        # Dev mode: accept any token, set expiry 30 days out
-        from datetime import datetime, timedelta
-        expires = (datetime.utcnow() + timedelta(days=30)).date().isoformat()
-        return True, expires
+    package_name = _play_package_name()
+    service_account_json = _play_service_account_json()
+    if not service_account_json or not package_name:
+        if _allow_play_dev_bypass():
+            expires = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
+            return True, expires
+        missing = []
+        if not package_name:
+            missing.append('GOOGLE_PLAY_PACKAGE_NAME')
+        if not service_account_json:
+            missing.append('GOOGLE_SERVICE_ACCOUNT_JSON')
+        raise RuntimeError(
+            'Google Play subscription verification is not configured. '
+            f'Missing env vars: {", ".join(missing)}. '
+            'Set ALLOW_PLAY_SUBSCRIPTION_DEV_BYPASS=true only for local development.'
+        )
 
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
 
     creds = service_account.Credentials.from_service_account_file(
-        GOOGLE_SERVICE_ACCOUNT_JSON,
+        service_account_json,
         scopes=['https://www.googleapis.com/auth/androidpublisher'],
     )
     service = build('androidpublisher', 'v3', credentials=creds, cache_discovery=False)
     result = service.purchases().subscriptions().get(
-        packageName=PLAY_PACKAGE_NAME,
+        packageName=package_name,
         subscriptionId=product_id,
         token=purchase_token,
     ).execute()
 
     expiry_ms = int(result.get('expiryTimeMillis', 0))
-    from datetime import datetime
-    expires_at = datetime.utcfromtimestamp(expiry_ms / 1000).date().isoformat()
+    expires_at = datetime.fromtimestamp(expiry_ms / 1000, timezone.utc).date().isoformat()
     payment_state = result.get('paymentState')
     is_valid = payment_state in (1, 2)  # 1=paid, 2=free trial
     return is_valid, expires_at

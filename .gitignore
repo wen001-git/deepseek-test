@@ -1,7 +1,24 @@
+# Python
 .env
+.env.*
 .venv/
+venv/
 users.db
 __pycache__/
 *.pyc
+*.pyo
 .DS_Store
-=0.6.0
+
+# Flutter / Android (mobile/)
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/*.iml
+mobile/.idea/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist

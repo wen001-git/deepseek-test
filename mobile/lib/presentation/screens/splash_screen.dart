@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -21,24 +22,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      backgroundColor: Color(0xFF5C6BC0),
+    final s = ref.watch(stringsProvider);
+    return Scaffold(
+      backgroundColor: const Color(0xFF5C6BC0),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.videocam_rounded, size: 72, color: Colors.white),
-            SizedBox(height: 16),
+            const Icon(Icons.videocam_rounded, size: 72, color: Colors.white),
+            const SizedBox(height: 16),
             Text(
-              '短视频创作助手',
-              style: TextStyle(
+              s.appName,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            SizedBox(height: 32),
-            CircularProgressIndicator(color: Colors.white54),
+            const SizedBox(height: 32),
+            const CircularProgressIndicator(color: Colors.white54),
           ],
         ),
       ),

@@ -21,6 +21,7 @@ _tmp_db.close()
 os.environ['DB_PATH'] = _tmp_db.name
 os.environ['JWT_SECRET'] = 'test-secret'
 os.environ['SECRET_KEY'] = 'test-flask-secret'
+os.environ['ALLOW_PLAY_SUBSCRIPTION_DEV_BYPASS'] = 'true'
 # Clear any SOCKS proxy that would break the httpx client
 for _k in ('http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'all_proxy'):
     os.environ.pop(_k, None)
@@ -396,7 +397,7 @@ class TestMobileVerifySubscription:
         assert '缺少' in resp.get_json()['error']
 
     def test_verify_dev_mode_pro(self, client, jwt_token):
-        """In dev mode (no GOOGLE env vars) any token should be accepted."""
+        """In explicit dev bypass mode any token should be accepted."""
         resp = client.post(
             '/api/mobile/verify-subscription',
             data=json.dumps({
@@ -423,6 +424,23 @@ class TestMobileVerifySubscription:
         )
         assert resp.status_code == 200
         assert resp.get_json()['tier'] == 'pro_plus'
+
+    def test_verify_missing_play_config_without_bypass(self, client, jwt_token, monkeypatch):
+        monkeypatch.delenv('GOOGLE_PLAY_PACKAGE_NAME', raising=False)
+        monkeypatch.delenv('GOOGLE_SERVICE_ACCOUNT_JSON', raising=False)
+        monkeypatch.delenv('ALLOW_PLAY_SUBSCRIPTION_DEV_BYPASS', raising=False)
+        resp = client.post(
+            '/api/mobile/verify-subscription',
+            data=json.dumps({
+                'purchase_token': 'prod_like_token',
+                'product_id': 'creator_pro_monthly',
+            }),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {jwt_token}'},
+        )
+        assert resp.status_code == 502
+        assert 'GOOGLE_PLAY_PACKAGE_NAME' in resp.get_json()['error']
+        assert 'GOOGLE_SERVICE_ACCOUNT_JSON' in resp.get_json()['error']
 
 
 # ─────────────────────────────────────────────────────────────────────────────
