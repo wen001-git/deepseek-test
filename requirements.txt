@@ -23,6 +23,7 @@ google-auth==2.49.1
 PyJWT>=2.8.0
 google-auth-httplib2==0.3.1
 googleapis-common-protos==1.74.0
+gevent==25.4.1
 gunicorn==23.0.0
 h11==0.16.0
 hf-xet==1.4.3
