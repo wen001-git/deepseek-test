@@ -36,6 +36,10 @@ def generate_stream(system_prompt: str, user_prompt: str, model: str = None, jso
         kwargs['response_format'] = {'type': 'json_object'}
     stream = client.chat.completions.create(**kwargs)
     for chunk in stream:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+        delta_content   = chunk.choices[0].delta.content
+        delta_reasoning = getattr(chunk.choices[0].delta, 'reasoning_content', None)
+        if delta_content:
+            yield delta_content
+        elif delta_reasoning:
+            # Thinking phase: send a space to keep the Render.com connection alive
+            yield ' '
