@@ -491,14 +491,14 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn-primary" onclick="submit('positioning','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('positioning','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary" onclick="submit('positioning','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('positioning','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-positioning">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-positioning-chat" onclick="switchResultTab('positioning','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-positioning-reasoner" onclick="switchResultTab('positioning','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-positioning-chat" onclick="switchResultTab('positioning','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-positioning-reasoner" onclick="switchResultTab('positioning','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-positioning" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -547,8 +547,8 @@
           </div>
 
           <div class="btn-group">
-            <button class="btn-primary" onclick="submitContentPlan('deepseek-chat')">⚡ 快速规划</button>
-            <button class="btn-secondary" onclick="submitContentPlan('deepseek-reasoner')">✨ 深度规划</button>
+            <button class="btn-primary" onclick="submitContentPlan('deepseek-v4-flash')">⚡ 快速规划</button>
+            <button class="btn-secondary" onclick="submitContentPlan('deepseek-v4-pro')">✨ 深度规划</button>
           </div>
         </div>
 
@@ -577,6 +577,7 @@
             <div class="cp-section-title">🚀 发展建议</div>
             <div class="growth-box" id="cp-growth"></div>
           </div>
+          <div id="cp-fallback" style="display:none;font-size:13px;line-height:1.8;color:#333"></div>
         </div>
       </div><!-- /wf-step2-wrapper -->
 
@@ -640,14 +641,14 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn-primary" onclick="submit('viral','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('viral','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary" onclick="submit('viral','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('viral','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-viral">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-viral-chat" onclick="switchResultTab('viral','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-viral-reasoner" onclick="switchResultTab('viral','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-viral-chat" onclick="switchResultTab('viral','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-viral-reasoner" onclick="switchResultTab('viral','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-viral" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -714,14 +715,14 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn-primary" onclick="submit('monetize','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('monetize','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary" onclick="submit('monetize','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('monetize','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-monetize">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-monetize-chat" onclick="switchResultTab('monetize','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-monetize-reasoner" onclick="switchResultTab('monetize','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-monetize-chat" onclick="switchResultTab('monetize','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-monetize-reasoner" onclick="switchResultTab('monetize','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-monetize" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -762,14 +763,14 @@
           style="width:100%;accent-color:#6366f1;cursor:pointer;margin-top:4px">
 
         <div class="btn-group">
-          <button class="btn-primary" onclick="submit('script','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('script','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary" onclick="submit('script','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('script','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-script">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-script-chat" onclick="switchResultTab('script','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-script-reasoner" onclick="switchResultTab('script','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-script-chat" onclick="switchResultTab('script','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-script-reasoner" onclick="switchResultTab('script','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-script" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -799,14 +800,14 @@
         <label>原始文案</label>
         <textarea id="rewrite-original" style="min-height: 150px;" placeholder="粘贴你想要改写的文案或视频标题..."></textarea>
         <div class="btn-group">
-          <button class="btn-primary" onclick="submit('rewrite','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('rewrite','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary" onclick="submit('rewrite','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('rewrite','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-rewrite">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-rewrite-chat" onclick="switchResultTab('rewrite','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-rewrite-reasoner" onclick="switchResultTab('rewrite','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-rewrite-chat" onclick="switchResultTab('rewrite','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-rewrite-reasoner" onclick="switchResultTab('rewrite','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-rewrite" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -858,8 +859,8 @@
         </div>
         <input type="text" id="bd-url" placeholder="粘贴链接或抖音完整分享文案..." style="width:100%; margin-bottom:8px">
         <div style="display:flex; gap:8px; align-items:stretch;">
-          <button class="btn-primary" id="bd-fetch-btn" onclick="fetchVideoUrl('deepseek-chat')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px; margin-top:0; width:auto">⚡ 解析</button>
-          <button class="btn-secondary" id="bd-fetch-btn-reasoner" onclick="fetchVideoUrl('deepseek-reasoner')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px">✨ 深度思考</button>
+          <button class="btn-primary" id="bd-fetch-btn" onclick="fetchVideoUrl('deepseek-v4-flash')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px; margin-top:0; width:auto">⚡ 解析</button>
+          <button class="btn-secondary" id="bd-fetch-btn-reasoner" onclick="fetchVideoUrl('deepseek-v4-pro')" style="flex:1; white-space:nowrap; padding:12px 16px; font-size:15px">✨ 深度思考</button>
         </div>
         <div id="bd-fetch-result" style="margin-top:10px"></div>
 
@@ -896,8 +897,8 @@
           <textarea id="bd-content" placeholder="粘贴视频脚本、字幕或内容简介，分析会更准确"></textarea>
           <p class="hint">只填标题也可以分析，填入内容后分析更深入</p>
           <div class="btn-group">
-            <button class="btn-primary" onclick="submit('breakdown','deepseek-chat')">⚡ 快速生成</button>
-            <button class="btn-secondary" onclick="submit('breakdown','deepseek-reasoner')">✨ 深度思考</button>
+            <button class="btn-primary" onclick="submit('breakdown','deepseek-v4-flash')">⚡ 快速生成</button>
+            <button class="btn-secondary" onclick="submit('breakdown','deepseek-v4-pro')">✨ 深度思考</button>
           </div>
         </div>
       </div>
@@ -910,8 +911,8 @@
       <!-- 分析结果 -->
       <div class="result-card" id="result-breakdown">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-breakdown-chat" onclick="switchResultTab('breakdown','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-breakdown-reasoner" onclick="switchResultTab('breakdown','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-breakdown-chat" onclick="switchResultTab('breakdown','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-breakdown-reasoner" onclick="switchResultTab('breakdown','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-breakdown" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -955,16 +956,16 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn-primary"   onclick="submit('imitate','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('imitate','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary"   onclick="submit('imitate','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('imitate','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-imitate">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-imitate-chat"
-                  onclick="switchResultTab('imitate','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-imitate-reasoner"
-                  onclick="switchResultTab('imitate','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-imitate-chat"
+                  onclick="switchResultTab('imitate','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-imitate-reasoner"
+                  onclick="switchResultTab('imitate','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-imitate" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -1007,14 +1008,14 @@
         </div>
 
         <div class="btn-group">
-          <button class="btn-primary" onclick="submit('director','deepseek-chat')">⚡ 快速生成</button>
-          <button class="btn-secondary" onclick="submit('director','deepseek-reasoner')">✨ 深度思考</button>
+          <button class="btn-primary" onclick="submit('director','deepseek-v4-flash')">⚡ 快速生成</button>
+          <button class="btn-secondary" onclick="submit('director','deepseek-v4-pro')">✨ 深度思考</button>
         </div>
       </div>
       <div class="result-card" id="result-director">
         <div class="result-tab-bar">
-          <button class="result-tab active" data-model="deepseek-chat" id="tab-director-chat" onclick="switchResultTab('director','deepseek-chat',this)">⚡ 快速<span class="dot"></span></button>
-          <button class="result-tab" data-model="deepseek-reasoner" id="tab-director-reasoner" onclick="switchResultTab('director','deepseek-reasoner',this)">✨ 深度思考<span class="dot"></span></button>
+          <button class="result-tab active" data-model="deepseek-v4-flash" id="tab-director-chat" onclick="switchResultTab('director','deepseek-v4-flash',this)">⚡ 快速<span class="dot"></span></button>
+          <button class="result-tab" data-model="deepseek-v4-pro" id="tab-director-reasoner" onclick="switchResultTab('director','deepseek-v4-pro',this)">✨ 深度思考<span class="dot"></span></button>
         </div>
         <div class="result-body">
           {% if is_admin %}<div id="debug-director" class="prompt-debug" style="display:none"></div>{% endif %}
@@ -1315,7 +1316,7 @@
   const PANELS = ['positioning','viral','monetize','script','rewrite','breakdown','imitate','director','content-plan','hottrends','profile'];
   const resultStore = {};
   let _stopGeneration = null;  // abort function for current stream, null when idle
-  PANELS.forEach(p => resultStore[p] = { 'deepseek-chat': null, 'deepseek-reasoner': null });
+  PANELS.forEach(p => resultStore[p] = { 'deepseek-v4-flash': null, 'deepseek-v4-pro': null });
 
   let _positioningResult = '';
 
@@ -1411,7 +1412,7 @@
     const allBtns = document.querySelectorAll(`#panel-${name} .btn-primary, #panel-${name} .btn-secondary`);
     const resultCard = document.getElementById('result-' + name);
     const contentEl  = document.getElementById('content-' + name);
-    const isReasoner = model === 'deepseek-reasoner';
+    const isReasoner = model === 'deepseek-v4-pro';
 
     // Disable all buttons EXCEPT clicked one (it becomes the stop button)
     allBtns.forEach(b => { if (b !== clickedBtn) b.disabled = true; });
@@ -1430,7 +1431,7 @@
     resultCard.classList.add('show');
     setTimeout(() => resultCard.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
     // 切换到当前模型的 tab
-    const tabSuffix = model === 'deepseek-chat' ? 'chat' : 'reasoner';
+    const tabSuffix = model === 'deepseek-v4-flash' ? 'chat' : 'reasoner';
     document.querySelectorAll(`#result-${name} .result-tab`).forEach(t => t.classList.remove('active'));
     const activeTab = document.getElementById(`tab-${name}-${tabSuffix}`);
     if (activeTab) activeTab.classList.add('active', 'has-result');
@@ -1523,7 +1524,7 @@
 
     const allBtns = document.querySelectorAll('#wf-step2-wrapper .btn-primary, #wf-step2-wrapper .btn-secondary');
     const origHTML = clickedBtn.innerHTML;
-    const isReasoner = model === 'deepseek-reasoner';
+    const isReasoner = model === 'deepseek-v4-pro';
     allBtns.forEach(b => { if (b !== clickedBtn) b.disabled = true; });
     clickedBtn.style.background = '#ef4444';
     clickedBtn.style.borderColor = '#ef4444';
@@ -1588,7 +1589,22 @@
       if (cleaned.startsWith('```')) {
         cleaned = cleaned.split('\n').slice(1).join('\n').replace(/```\s*$/, '').trim();
       }
-      const plan = JSON.parse(cleaned);
+      let plan;
+      try {
+        plan = JSON.parse(cleaned);
+      } catch (parseErr) {
+        // JSON truncated (e.g. server timeout) — show raw content as markdown fallback
+        const cpResult = document.getElementById('cp-result');
+        const cpFallback = document.getElementById('cp-fallback');
+        if (cleaned.trim()) {
+          cpResult.style.display = 'block';
+          cpFallback.style.display = 'block';
+          cpFallback.innerHTML = '<div style="color:#f59e0b;font-size:12px;margin-bottom:10px">⚠️ 内容规划返回不完整，以下为原始输出：</div>' + marked.parse(cleaned);
+        } else {
+          alert('规划失败：响应为空，请重试');
+        }
+        return;
+      }
       renderContentPlan(plan);
     } catch (e) {
       if (e.name !== 'AbortError') alert('规划失败：' + e.message);
@@ -1841,7 +1857,7 @@
 
   async function generateShotTable() {
     const activeTab = document.querySelector('#result-script .result-tab.active');
-    const model = activeTab?.dataset.model || 'deepseek-chat';
+    const model = activeTab?.dataset.model || 'deepseek-v4-flash';
     const script = resultStore['script']?.[model] || '';
     if (!script) { alert('请先生成脚本'); return; }
 
@@ -1889,7 +1905,7 @@
 
   async function generateImitateShotTable() {
     const activeTab = document.querySelector('#result-imitate .result-tab.active');
-    const model = activeTab?.dataset.model || 'deepseek-chat';
+    const model = activeTab?.dataset.model || 'deepseek-v4-flash';
     const script = resultStore['imitate']?.[model] || '';
     if (!script) { alert('请先生成仿写脚本'); return; }
 
@@ -2087,7 +2103,7 @@
 
   function copyResult(name) {
     const activeTab = document.querySelector(`#result-${name} .result-tab.active`);
-    const model = activeTab?.dataset.model || 'deepseek-chat';
+    const model = activeTab?.dataset.model || 'deepseek-v4-flash';
     const text = resultStore[name]?.[model] || '';
     navigator.clipboard.writeText(text).then(() => {
       alert('已复制到剪贴板');
@@ -2193,7 +2209,7 @@
     guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
   }
 
-  async function fetchVideoUrl(model = 'deepseek-chat') {
+  async function fetchVideoUrl(model = 'deepseek-v4-flash') {
     const input = document.getElementById('bd-url').value.trim();
     if (!input) { alert('请先输入视频链接或分享文案'); return; }
 
@@ -2210,13 +2226,13 @@
 
 
 
-  async function fetchAndStreamSharetext(sharetext, isRetry, model = 'deepseek-chat', prefetchedContent = '') {
+  async function fetchAndStreamSharetext(sharetext, isRetry, model = 'deepseek-v4-flash', prefetchedContent = '') {
     const btn         = document.getElementById('bd-fetch-btn');
     const btnReasoner = document.getElementById('bd-fetch-btn-reasoner');
     const resultBox   = document.getElementById('bd-fetch-result');
     btn.disabled = true;
     btnReasoner.disabled = true;
-    const isReasoner = model === 'deepseek-reasoner';
+    const isReasoner = model === 'deepseek-v4-pro';
     if (isReasoner) {
       btnReasoner.innerHTML = isRetry ? '<span class="spinner"></span>重试中...' : '<span class="spinner"></span>思考中...';
     } else {
@@ -2270,7 +2286,7 @@
       }
 
       bar.style.display = 'none';
-      const storeKey = model === 'deepseek-reasoner' ? 'deepseek-reasoner' : 'deepseek-chat';
+      const storeKey = model === 'deepseek-v4-pro' ? 'deepseek-v4-pro' : 'deepseek-v4-flash';
       resultStore['breakdown'][storeKey] = fullText;
     } catch (e) {
       resultBox.innerHTML = `<div class="bd-error-box">请求失败：${escapeHtml(e.message)}</div>`;
@@ -2283,7 +2299,7 @@
     }
   }
 
-  async function fetchVideoUrlLegacy(url, model = 'deepseek-chat') {
+  async function fetchVideoUrlLegacy(url, model = 'deepseek-v4-flash') {
     const btn = document.getElementById('bd-fetch-btn');
     const resultBox = document.getElementById('bd-fetch-result');
     btn.disabled = true;
@@ -2444,9 +2460,9 @@
 
   // ── Result persistence keys (viral / monetize / script) ──────────────────
   const PERSIST_RESULT_KEYS = {
-    viral:    { 'deepseek-chat': 'res_viral_chat',    'deepseek-reasoner': 'res_viral_reasoner' },
-    monetize: { 'deepseek-chat': 'res_monetize_chat', 'deepseek-reasoner': 'res_monetize_reasoner' },
-    script:   { 'deepseek-chat': 'res_script_chat',   'deepseek-reasoner': 'res_script_reasoner' },
+    viral:    { 'deepseek-v4-flash': 'res_viral_chat',    'deepseek-v4-pro': 'res_viral_reasoner' },
+    monetize: { 'deepseek-v4-flash': 'res_monetize_chat', 'deepseek-v4-pro': 'res_monetize_reasoner' },
+    script:   { 'deepseek-v4-flash': 'res_script_chat',   'deepseek-v4-pro': 'res_script_reasoner' },
   };
 
   function saveResultToStorage(name, model, text) {
@@ -2713,7 +2729,7 @@
         const text = localStorage.getItem(storageKey);
         if (!text) return;
         resultStore[panelName][model] = text;
-        const tabSuffix = model === 'deepseek-chat' ? 'chat' : 'reasoner';
+        const tabSuffix = model === 'deepseek-v4-flash' ? 'chat' : 'reasoner';
         const tab = document.getElementById(`tab-${panelName}-${tabSuffix}`);
         if (tab) tab.classList.add('has-result');
         if (!activeModel) activeModel = model; // prefer chat (iterated first)
@@ -2727,7 +2743,7 @@
       else contentEl.innerHTML = marked.parse(text);
       resultCard.classList.add('show');
       document.querySelectorAll(`#result-${panelName} .result-tab`).forEach(t => t.classList.remove('active'));
-      const tabSuffix = activeModel === 'deepseek-chat' ? 'chat' : 'reasoner';
+      const tabSuffix = activeModel === 'deepseek-v4-flash' ? 'chat' : 'reasoner';
       const activeTab = document.getElementById(`tab-${panelName}-${tabSuffix}`);
       if (activeTab) activeTab.classList.add('active');
       updateNavResultDot(panelName);

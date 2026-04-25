@@ -9,7 +9,7 @@ client = OpenAI(
     base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
 )
 
-MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 
 def generate_text(system_prompt: str, user_prompt: str) -> str:
@@ -23,8 +23,8 @@ def generate_text(system_prompt: str, user_prompt: str) -> str:
     return response.choices[0].message.content
 
 
-def generate_stream(system_prompt: str, user_prompt: str, model: str = None):
-    stream = client.chat.completions.create(
+def generate_stream(system_prompt: str, user_prompt: str, model: str = None, json_mode: bool = False):
+    kwargs = dict(
         model=model or MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
@@ -32,6 +32,9 @@ def generate_stream(system_prompt: str, user_prompt: str, model: str = None):
         ],
         stream=True,
     )
+    if json_mode:
+        kwargs['response_format'] = {'type': 'json_object'}
+    stream = client.chat.completions.create(**kwargs)
     for chunk in stream:
         delta = chunk.choices[0].delta.content
         if delta:
