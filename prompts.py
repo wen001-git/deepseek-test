@@ -152,36 +152,33 @@ DAILY_HOURS_OPTIONS = ["< 1小时", "1-2小时", "2-4小时", "4小时以上"]
 def build_content_plan_prompt(industry: str, platform: str, followers: str, daily_hours: str, positioning_result: str = '', target_audience: str = '') -> str:
     pos_section = f"\n\n【定位分析参考】（请结合以下定位分析结果制定内容规划）：\n{positioning_result.strip()}" if positioning_result.strip() else ""
     ta_section = f"\n目标客户画像：{target_audience.strip()}" if target_audience.strip() else ""
-    return f"""请为以下创作者制定30天内容发布计划，严格以 JSON 格式输出，不要有任何额外文字：
+    return f"""请为以下创作者制定30天内容发布计划：
 
 行业/领域：{industry}
 目标平台：{platform}
 当前粉丝量：{followers}
 每天可用创作时间：{daily_hours}{ta_section}{pos_section}
 
-输出以下 JSON 结构（key 名称完全一致）：
-{{
-  "daily_count": <每天发几条，整数>,
-  "best_post_times": ["HH:MM", ...],
-  "type_distribution": [
-    {{"name": "内容类型名", "days": <天数，整数>, "ratio": <百分比整数，不带%>}}
-  ],
-  "weekly_template": [
-    {{"day": "周一", "type": "内容类型名", "theme": "该类型具体选题示例"}}
-  ],
-  "growth_advice": "针对当前粉丝阶段的发展建议，50-80字",
-  "reasons": {{
-    "posting_time": "解释为什么选这几个发布时间点，结合平台用户活跃规律和该行业受众习惯，2-3句",
-    "content_mix": "解释为什么做这样的内容类型配比，每种类型的作用（涨粉/互动/变现/留存），2-3句",
-    "weekly_rhythm": "解释一周排期的逻辑，为什么某些类型放在工作日/周末，节奏如何帮助账号成长，2-3句"
-  }}
-}}
+请按以下两部分顺序输出：
 
-要求：
-- type_distribution 中各 days 之和 = 30，ratio 之和 = 100
-- weekly_template 包含周一到周日共7条，theme 写具体可执行的选题方向
-- best_post_times 给出 2-3 个最佳发布时间点
-- reasons 中每条 2-3 句，语言通俗，让普通创作者能看懂"""
+【第一部分】用清晰的中文 Markdown 格式写出完整的内容规划说明，包含：
+- 每天发布条数和最佳发布时间（说明选择理由）
+- 内容类型分配比例及各类型的作用（涨粉/互动/变现/留存）
+- 一周内容排期（周一到周日，每天具体可执行的选题方向）
+- 针对当前粉丝阶段的发展建议
+
+【第二部分】在全文末尾紧接着附上以下 JSON 数据块，key 名称必须完全一致，不要省略任何字段：
+```json
+{{
+  "daily_count": <整数>,
+  "best_post_times": ["HH:MM", "HH:MM"],
+  "type_distribution": [{{"name": "类型名", "days": <整数>, "ratio": <整数不带%>}}],
+  "weekly_template": [{{"day": "周一", "type": "类型名", "theme": "具体选题方向"}}],
+  "growth_advice": "50-80字发展建议"
+}}
+```
+
+要求：type_distribution 各 days 之和 = 30，ratio 之和 = 100；weekly_template 含周一到周日共 7 条。"""
 
 
 # ─── 爆款选题 ────────────────────────────────────────────────────────────────

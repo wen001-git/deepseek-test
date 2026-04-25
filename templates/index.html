@@ -556,6 +556,7 @@
 
         <div class="card" id="cp-result" style="display:none">
           {% if is_admin %}<div id="debug-content-plan" class="prompt-debug" style="display:none"></div>{% endif %}
+          <div id="cp-markdown" style="display:none;font-size:13px;line-height:1.9;color:#333;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f0f0f0"></div>
           <div class="cp-meta" id="cp-meta"></div>
           <div id="cp-reason-time"></div>
           <div class="cp-section">
@@ -1557,20 +1558,26 @@
         const err = await res.json().catch(() => ({ error: '请求失败' }));
         throw new Error(err.error || '请求失败');
       }
-      // 流式读取，实时显示字数进度
+      // 流式读取，实时渲染 Markdown 内容
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let fullText = '';
+      const cpMarkdown = document.getElementById('cp-markdown');
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         fullText += decoder.decode(value, { stream: true });
-        const realContent = fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, '');
+        const realContent = fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, '').trimStart();
         if (isReasoner && cpLoading.style.display !== 'none' && realContent.trim()) {
           cpLoading.style.display = 'none';
         }
-        if (realContent.trim()) {
-          clickedBtn.innerHTML = `<span class="spinner"></span>生成中 ${realContent.length} 字...`;
+        // Show the Markdown part progressively (strip the trailing json block while streaming)
+        const mdOnly = realContent.replace(/```json[\s\S]*$/, '').trimEnd();
+        if (mdOnly.trim()) {
+          document.getElementById('cp-result').style.display = 'block';
+          cpMarkdown.style.display = 'block';
+          cpMarkdown.innerHTML = marked.parse(mdOnly);
+          clickedBtn.innerHTML = `<span class="spinner"></span>生成中 ${mdOnly.length} 字... ⏹ 停止`;
         }
       }
       // Strip admin debug prefix if present
@@ -1584,28 +1591,27 @@
           fullText = fullText.slice(debugMatch[0].length);
         }
       }
-      // 去除可能的 markdown 代码块包裹
+      // Extract JSON block from end of response, render visualization
       let cleaned = fullText.trim();
-      if (cleaned.startsWith('```')) {
-        cleaned = cleaned.split('\n').slice(1).join('\n').replace(/```\s*$/, '').trim();
-      }
-      let plan;
-      try {
-        plan = JSON.parse(cleaned);
-      } catch (parseErr) {
-        // JSON truncated (e.g. server timeout) — show raw content as markdown fallback
-        const cpResult = document.getElementById('cp-result');
-        const cpFallback = document.getElementById('cp-fallback');
-        if (cleaned.trim()) {
-          cpResult.style.display = 'block';
-          cpFallback.style.display = 'block';
-          cpFallback.innerHTML = '<div style="color:#f59e0b;font-size:12px;margin-bottom:10px">⚠️ 内容规划返回不完整，以下为原始输出：</div>' + marked.parse(cleaned);
-        } else {
-          alert('规划失败：响应为空，请重试');
+      if (IS_ADMIN) { /* debug already handled above */ }
+      const jsonMatch = cleaned.match(/```json\s*([\s\S]+?)\s*```\s*$/);
+      if (jsonMatch) {
+        try {
+          const plan = JSON.parse(jsonMatch[1]);
+          // Update markdown display without the json block
+          const mdOnly = cleaned.replace(/```json[\s\S]*$/, '').trim();
+          if (mdOnly) {
+            document.getElementById('cp-markdown').style.display = 'block';
+            document.getElementById('cp-markdown').innerHTML = marked.parse(mdOnly);
+          }
+          renderContentPlan(plan);
+        } catch (_) {
+          // JSON malformed — markdown already visible from streaming, nothing extra needed
         }
-        return;
+      } else if (!cleaned.trim()) {
+        alert('规划失败：响应为空，请重试');
       }
-      renderContentPlan(plan);
+      // else: markdown already visible from streaming (no json block found but content exists)
     } catch (e) {
       if (e.name !== 'AbortError') alert('规划失败：' + e.message);
     } finally {
