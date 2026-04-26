@@ -1532,6 +1532,45 @@
   // ── 内容规划（流式接收，完成后解析 JSON） ────────────────────────────────
   const CP_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#3b82f6","#8b5cf6","#ec4899","#14b8a6"];
 
+  // 解析并渲染内容规划结果（streaming 和 polling 两种流程共用）
+  function _finalizeCpResult(fullText) {
+    if (IS_ADMIN) {
+      const debugMatch = fullText.match(/^\[DEBUG:([\s\S]*?):DEBUG\]\n/);
+      if (debugMatch) {
+        try {
+          const dbg = JSON.parse(debugMatch[1]);
+          showPromptDebug('content-plan', dbg.sys, dbg.usr);
+        } catch (_) {}
+        fullText = fullText.slice(debugMatch[0].length);
+      }
+    }
+    const cpMarkdown = document.getElementById('cp-markdown');
+    const realContent = fullText.trim();
+    const mdOnly = realContent
+      .replace(/```json[\s\S]*?```/g, '')
+      .replace(/```json[\s\S]*$/, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trimEnd();
+    if (mdOnly.trim()) {
+      document.getElementById('cp-result').style.display = 'block';
+      cpMarkdown.style.display = 'block';
+      cpMarkdown.innerHTML = marked.parse(mdOnly);
+    }
+    const cleaned = realContent;
+    const jsonStart = cleaned.lastIndexOf('```json');
+    const jsonMatch = jsonStart >= 0 ? cleaned.slice(jsonStart).match(/^```json\s*([\s\S]+?)\s*```/) : null;
+    if (jsonMatch) {
+      try {
+        const plan = JSON.parse(jsonMatch[1]);
+        cpMarkdown.style.display = 'none';
+        document.getElementById('cp-markdown-toggle').style.display = 'block';
+        renderContentPlan(plan);
+      } catch (_) {}
+    } else if (!cleaned.trim()) {
+      alert('规划失败：响应为空，请重试');
+    }
+  }
+
   async function submitContentPlan(model) {
     const industry = document.getElementById('cp-industry').value.trim();
     const platform = document.getElementById('cp-platform').value;
@@ -1557,84 +1596,86 @@
     const cpLoading = document.getElementById('cp-loading');
     cpLoading.innerHTML = isReasoner ? thinkingBarHTML() : '';
     cpLoading.style.display = isReasoner ? 'block' : 'none';
+
+    const bodyPayload = {
+      industry,
+      platform,
+      followers: document.getElementById('cp-followers').value,
+      daily_hours: document.getElementById('cp-hours').value,
+      positioning_result: _positioningResult,
+      target_audience: document.getElementById('cp-target-audience').value.trim(),
+      model,
+    };
+
     try {
-      const res = await fetch('/api/content-plan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          industry,
-          platform,
-          followers: document.getElementById('cp-followers').value,
-          daily_hours: document.getElementById('cp-hours').value,
-          positioning_result: _positioningResult,
-          target_audience: document.getElementById('cp-target-audience').value.trim(),
-          model,
-        }),
-        signal: controller.signal,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: '请求失败' }));
-        throw new Error(err.error || '请求失败');
-      }
-      // 流式读取，实时渲染 Markdown 内容
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let fullText = '';
-      const cpMarkdown = document.getElementById('cp-markdown');
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        fullText += decoder.decode(value, { stream: true });
-        const realContent = fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, '').trimStart();
-        if (isReasoner && cpLoading.style.display !== 'none' && realContent.trim()) {
-          cpLoading.style.display = 'none';
+      if (isReasoner) {
+        // ── 深度规划：后台任务 + 轮询（避免 Render 30s 流式超时）──────────
+        const startRes = await fetch('/api/content-plan/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload),
+          signal: controller.signal,
+        });
+        if (!startRes.ok) {
+          const err = await startRes.json().catch(() => ({ error: '请求失败' }));
+          throw new Error(err.error || '请求失败');
         }
-        // Show the Markdown part progressively
-        // Strip all complete ```json...``` blocks (AI may place JSON mid-response),
-        // then strip any in-progress block at the very end
-        const mdOnly = realContent
-          .replace(/```json[\s\S]*?```/g, '')
-          .replace(/```json[\s\S]*$/, '')
-          .replace(/\n{3,}/g, '\n\n')
-          .trimEnd();
-        if (mdOnly.trim()) {
-          document.getElementById('cp-result').style.display = 'block';
-          cpMarkdown.style.display = 'block';
-          cpMarkdown.innerHTML = marked.parse(mdOnly);
-          clickedBtn.innerHTML = `<span class="spinner"></span>生成中 ${mdOnly.length} 字... ⏹ 停止`;
+        const { task_id } = await startRes.json();
+
+        // 每 3 秒轮询一次任务状态
+        while (true) {
+          await new Promise((resolve, reject) => {
+            const t = setTimeout(resolve, 3000);
+            controller.signal.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+          });
+          const pollRes = await fetch(`/api/content-plan/result/${task_id}`, { signal: controller.signal });
+          const taskData = await pollRes.json();
+          if (taskData.status === 'done') {
+            cpLoading.style.display = 'none';
+            document.getElementById('cp-result').style.display = 'block';
+            _finalizeCpResult(taskData.result);
+            break;
+          } else if (taskData.status === 'error') {
+            throw new Error(taskData.result);
+          }
+          // 'pending' — 继续等待
         }
-      }
-      // Strip admin debug prefix if present
-      if (IS_ADMIN) {
-        const debugMatch = fullText.match(/^\[DEBUG:([\s\S]*?):DEBUG\]\n/);
-        if (debugMatch) {
-          try {
-            const dbg = JSON.parse(debugMatch[1]);
-            showPromptDebug('content-plan', dbg.sys, dbg.usr);
-          } catch (_) {}
-          fullText = fullText.slice(debugMatch[0].length);
+      } else {
+        // ── 快速规划：流式读取，实时渲染 Markdown ────────────────────────
+        const res = await fetch('/api/content-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload),
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: '请求失败' }));
+          throw new Error(err.error || '请求失败');
         }
-      }
-      // Extract JSON block from response, render visualization
-      // Use lastIndexOf so we always find the LAST ```json block (AI may output JSON mid-response)
-      let cleaned = fullText.trim();
-      if (IS_ADMIN) { /* debug already handled above */ }
-      const jsonStart = cleaned.lastIndexOf('```json');
-      const jsonMatch = jsonStart >= 0 ? cleaned.slice(jsonStart).match(/^```json\s*([\s\S]+?)\s*```/) : null;
-      if (jsonMatch) {
-        try {
-          const plan = JSON.parse(jsonMatch[1]);
-          // JSON parsed successfully → hide markdown, show toggle button + visualization
-          document.getElementById('cp-markdown').style.display = 'none';
-          document.getElementById('cp-markdown-toggle').style.display = 'block';
-          renderContentPlan(plan);
-        } catch (_) {
-          // JSON malformed — keep the markdown visible as fallback, nothing extra needed
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        const cpMarkdown = document.getElementById('cp-markdown');
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          fullText += decoder.decode(value, { stream: true });
+          const realContent = fullText.replace(/^\[DEBUG:[\s\S]*?:DEBUG\]\n/, '').trimStart();
+          // Strip complete and in-progress JSON blocks for progressive Markdown display
+          const mdOnly = realContent
+            .replace(/```json[\s\S]*?```/g, '')
+            .replace(/```json[\s\S]*$/, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trimEnd();
+          if (mdOnly.trim()) {
+            document.getElementById('cp-result').style.display = 'block';
+            cpMarkdown.style.display = 'block';
+            cpMarkdown.innerHTML = marked.parse(mdOnly);
+            clickedBtn.innerHTML = `<span class="spinner"></span>生成中 ${mdOnly.length} 字... ⏹ 停止`;
+          }
         }
-      } else if (!cleaned.trim()) {
-        alert('规划失败：响应为空，请重试');
+        _finalizeCpResult(fullText);
       }
-      // else: markdown already visible from streaming (no json block found but content exists)
     } catch (e) {
       if (e.name !== 'AbortError') alert('规划失败：' + e.message);
     } finally {

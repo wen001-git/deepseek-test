@@ -12,9 +12,9 @@ client = OpenAI(
 MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 
-def generate_text(system_prompt: str, user_prompt: str) -> str:
+def generate_text(system_prompt: str, user_prompt: str, model: str = None) -> str:
     response = client.chat.completions.create(
-        model=MODEL,
+        model=model or MODEL,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},

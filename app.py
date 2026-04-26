@@ -1,8 +1,10 @@
 import os
 import re
+import uuid
+import threading
 import requests
 from flask import Flask, request, jsonify, render_template, Response, stream_with_context, session, redirect
-from deepseek_client import generate_stream
+from deepseek_client import generate_stream, generate_text
 from database import init_db
 from search_client import search_bilibili, search_youtube, search_weixin_video, search_xiaohongshu, search_douyin, fetch_video_from_url, fetch_video_content
 from hot_trends_client import fetch_hot, bust_cache, PLATFORMS as HOT_PLATFORMS
@@ -374,6 +376,57 @@ def api_hot_trends():
         bust_cache(platform)
     data, ts, error = fetch_hot(platform)
     return jsonify({"data": data, "ts": ts, "error": error, "platforms": HOT_PLATFORMS})
+
+
+# ─── 内容规划（异步任务，供深度规划使用）────────────────────────────────────────
+
+_tasks = {}  # task_id -> {'status': 'pending'|'done'|'error', 'result': str}
+
+
+@app.route("/api/content-plan/start", methods=["POST"])
+def api_content_plan_start():
+    data = request.get_json()
+    industry = data.get("industry", "").strip()
+    platform = data.get("platform", "").strip()
+    if not industry or not platform:
+        return jsonify({"error": "请填写行业领域和目标平台"}), 400
+
+    model = data.get("model") or None
+    prompt = build_content_plan_prompt(
+        industry, platform,
+        data.get("followers", "0 - 1千"),
+        data.get("daily_hours", "1-2小时"),
+        data.get("positioning_result", ""),
+        data.get("target_audience", ""),
+    )
+
+    is_admin = session.get('role') == 'admin'
+    debug_prefix = ""
+    if is_admin:
+        import json as _json
+        marker = _json.dumps({"sys": CONTENT_PLAN_SYSTEM_PROMPT, "usr": prompt}, ensure_ascii=False)
+        debug_prefix = f"[DEBUG:{marker}:DEBUG]\n"
+
+    task_id = str(uuid.uuid4())
+    _tasks[task_id] = {'status': 'pending', 'result': ''}
+
+    def run():
+        try:
+            result = generate_text(CONTENT_PLAN_SYSTEM_PROMPT, prompt, model)
+            _tasks[task_id] = {'status': 'done', 'result': debug_prefix + result}
+        except Exception as e:
+            _tasks[task_id] = {'status': 'error', 'result': str(e)}
+
+    threading.Thread(target=run, daemon=True).start()
+    return jsonify({'task_id': task_id})
+
+
+@app.route("/api/content-plan/result/<task_id>")
+def api_content_plan_result(task_id):
+    task = _tasks.pop(task_id, None) if _tasks.get(task_id, {}).get('status') in ('done', 'error') else _tasks.get(task_id)
+    if task is None:
+        return jsonify({'status': 'not_found'}), 404
+    return jsonify(task)
 
 
 if __name__ == "__main__":
