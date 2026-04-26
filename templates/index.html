@@ -1352,8 +1352,8 @@
         if (bracketEnd !== -1) {
           // Skip past 】, optional closing markdown markers, colon, and whitespace
           let rest = resultText.slice(bracketEnd + 1).replace(/^[\*\_]*[：:\s]*/, '');
-          // Stop at next section header (requires newline before 【)
-          const nextIdx = rest.search(/\n【|\n+\d+[\.、]/);
+          // Stop at next section header: 【...】, markdown ##, or numbered list
+          const nextIdx = rest.search(/\n【|\n#+\s|\n+\d+[\.、]/);
           const extracted = (nextIdx === -1 ? rest : rest.slice(0, nextIdx)).trim();
           if (extracted) taEl.value = extracted;
         }
