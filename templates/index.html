@@ -556,7 +556,14 @@
 
         <div class="card" id="cp-result" style="display:none">
           {% if is_admin %}<div id="debug-content-plan" class="prompt-debug" style="display:none"></div>{% endif %}
-          <div id="cp-markdown" style="display:none;font-size:13px;line-height:1.9;color:#333;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #f0f0f0"></div>
+          <div id="cp-markdown" style="display:none;font-size:13px;line-height:1.9;color:#333;margin-bottom:12px;padding-bottom:16px;border-bottom:1px solid #f0f0f0"></div>
+          <div id="cp-markdown-toggle" style="display:none;margin-bottom:20px">
+            <button onclick="toggleCpMarkdown(this)"
+              style="background:none;border:1px solid #e5e7eb;border-radius:20px;padding:5px 14px;font-size:12px;color:#6b7280;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
+              <span style="transition:transform .2s;display:inline-block">📄</span>
+              查看完整规划文案
+            </button>
+          </div>
           <div class="cp-meta" id="cp-meta"></div>
           <div id="cp-reason-time"></div>
           <div class="cp-section">
@@ -1546,6 +1553,7 @@
     const controller = new AbortController();
     _stopGeneration = () => controller.abort();
     document.getElementById('cp-result').style.display = 'none';
+    document.getElementById('cp-markdown-toggle').style.display = 'none';
     const cpLoading = document.getElementById('cp-loading');
     cpLoading.innerHTML = isReasoner ? thinkingBarHTML() : '';
     cpLoading.style.display = isReasoner ? 'block' : 'none';
@@ -1616,8 +1624,9 @@
       if (jsonMatch) {
         try {
           const plan = JSON.parse(jsonMatch[1]);
-          // JSON parsed successfully → hide the streaming markdown, show only the visualization
+          // JSON parsed successfully → hide markdown, show toggle button + visualization
           document.getElementById('cp-markdown').style.display = 'none';
+          document.getElementById('cp-markdown-toggle').style.display = 'block';
           renderContentPlan(plan);
         } catch (_) {
           // JSON malformed — keep the markdown visible as fallback, nothing extra needed
@@ -1771,6 +1780,15 @@
     const open = body.style.display === 'block';
     body.style.display = open ? 'none' : 'block';
     arrow.style.transform = open ? '' : 'rotate(90deg)';
+  }
+
+  function toggleCpMarkdown(btn) {
+    const md = document.getElementById('cp-markdown');
+    const open = md.style.display === 'block';
+    md.style.display = open ? 'none' : 'block';
+    btn.innerHTML = open
+      ? '<span>📄</span> 查看完整规划文案'
+      : '<span>📄</span> 收起规划文案';
   }
 
   function showCalTip(day, type, theme, color) {
