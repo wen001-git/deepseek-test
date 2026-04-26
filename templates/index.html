@@ -1571,8 +1571,14 @@
         if (isReasoner && cpLoading.style.display !== 'none' && realContent.trim()) {
           cpLoading.style.display = 'none';
         }
-        // Show the Markdown part progressively (strip the trailing json block while streaming)
-        const mdOnly = realContent.replace(/```json[\s\S]*$/, '').trimEnd();
+        // Show the Markdown part progressively
+        // Strip all complete ```json...``` blocks (AI may place JSON mid-response),
+        // then strip any in-progress block at the very end
+        const mdOnly = realContent
+          .replace(/```json[\s\S]*?```/g, '')
+          .replace(/```json[\s\S]*$/, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trimEnd();
         if (mdOnly.trim()) {
           document.getElementById('cp-result').style.display = 'block';
           cpMarkdown.style.display = 'block';
@@ -1591,15 +1597,21 @@
           fullText = fullText.slice(debugMatch[0].length);
         }
       }
-      // Extract JSON block from end of response, render visualization
+      // Extract JSON block from response, render visualization
+      // Use lastIndexOf so we always find the LAST ```json block (AI may output JSON mid-response)
       let cleaned = fullText.trim();
       if (IS_ADMIN) { /* debug already handled above */ }
-      const jsonMatch = cleaned.match(/```json\s*([\s\S]+?)\s*```\s*$/);
+      const jsonStart = cleaned.lastIndexOf('```json');
+      const jsonMatch = jsonStart >= 0 ? cleaned.slice(jsonStart).match(/^```json\s*([\s\S]+?)\s*```/) : null;
       if (jsonMatch) {
         try {
           const plan = JSON.parse(jsonMatch[1]);
-          // Update markdown display without the json block
-          const mdOnly = cleaned.replace(/```json[\s\S]*$/, '').trim();
+          // Show all content EXCEPT the last JSON block as markdown
+          // Strip every complete ```json...``` block so stray JSON blocks don't appear in prose
+          const mdOnly = cleaned.slice(0, jsonStart)
+            .replace(/```json[\s\S]*?```/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
           if (mdOnly) {
             document.getElementById('cp-markdown').style.display = 'block';
             document.getElementById('cp-markdown').innerHTML = marked.parse(mdOnly);
