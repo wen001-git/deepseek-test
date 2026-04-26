@@ -569,6 +569,16 @@
             <div class="cal-tooltip empty cal-hint-bounce" id="cp-tooltip">👆 点击任意日期查看当日主题</div>
             <div class="calendar-grid" id="cp-calendar"></div>
           </div>
+          <div class="cp-section" id="cp-30days-section" style="display:none">
+            <button id="cp-30days-toggle" onclick="toggle30Days(this)"
+              style="background:none;border:1px solid #e5e7eb;border-radius:20px;padding:5px 14px;font-size:12px;color:#6b7280;cursor:pointer;display:inline-flex;align-items:center;gap:5px">
+              <span id="cp-30days-arrow" style="transition:transform .2s;display:inline-block">▶</span>
+              展开全部 30 天
+            </button>
+            <div id="cp-30days-body" style="display:none;margin-top:10px">
+              <table class="weekly-table" id="cp-30days-table" style="width:100%"></table>
+            </div>
+          </div>
           <div class="cp-section">
             <div class="cp-section-title">📋 一周内容模板</div>
             <table class="weekly-table" id="cp-weekly"></table>
@@ -1697,6 +1707,26 @@
         return `<tr><td>${w.day}</td><td><span class="type-badge" style="background:${color}">${w.type}</span></td><td>${w.theme}</td><td><button class="btn-goto-script" onclick="goToScript('${safeTheme}')">✏️ 制作脚本</button></td></tr>`;
       }).join('') + '</tbody>';
 
+    // 30-day full list (cycling weekly_template, same logic as calendar)
+    const t30 = document.getElementById('cp-30days-table');
+    if (t30) {
+      const wt = data.weekly_template || [];
+      const rows30 = Array.from({ length: 30 }, (_, i) => {
+        const w = wt[i % (wt.length || 7)] || {};
+        const color = colorMap[w.type] || '#999';
+        const safeTheme = (w.theme || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `<tr>
+          <td style="width:54px;color:#888;font-size:12px;white-space:nowrap">第${i+1}天</td>
+          <td><span class="type-badge" style="background:${color}">${w.type || ''}</span></td>
+          <td style="font-size:13px;color:#444">${w.theme || ''}</td>
+          <td><button class="btn-goto-script" onclick="goToScript('${safeTheme}')">✏️ 制作脚本</button></td>
+        </tr>`;
+      }).join('');
+      t30.innerHTML = `<thead><tr><th>天数</th><th>内容类型</th><th>主题方向</th><th></th></tr></thead><tbody>${rows30}</tbody>`;
+    }
+    const s30 = document.getElementById('cp-30days-section');
+    if (s30) s30.style.display = 'block';
+
     // growth
     document.getElementById('cp-growth').textContent = data.growth_advice || '';
 
@@ -1733,6 +1763,14 @@
     const body = document.getElementById(bodyId);
     body.classList.toggle('show');
     toggleEl.classList.toggle('open');
+  }
+
+  function toggle30Days(btn) {
+    const body = document.getElementById('cp-30days-body');
+    const arrow = document.getElementById('cp-30days-arrow');
+    const open = body.style.display === 'block';
+    body.style.display = open ? 'none' : 'block';
+    arrow.style.transform = open ? '' : 'rotate(90deg)';
   }
 
   function showCalTip(day, type, theme, color) {
