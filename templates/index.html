@@ -1606,19 +1606,11 @@
       if (jsonMatch) {
         try {
           const plan = JSON.parse(jsonMatch[1]);
-          // Show all content EXCEPT the last JSON block as markdown
-          // Strip every complete ```json...``` block so stray JSON blocks don't appear in prose
-          const mdOnly = cleaned.slice(0, jsonStart)
-            .replace(/```json[\s\S]*?```/g, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-          if (mdOnly) {
-            document.getElementById('cp-markdown').style.display = 'block';
-            document.getElementById('cp-markdown').innerHTML = marked.parse(mdOnly);
-          }
+          // JSON parsed successfully → hide the streaming markdown, show only the visualization
+          document.getElementById('cp-markdown').style.display = 'none';
           renderContentPlan(plan);
         } catch (_) {
-          // JSON malformed — markdown already visible from streaming, nothing extra needed
+          // JSON malformed — keep the markdown visible as fallback, nothing extra needed
         }
       } else if (!cleaned.trim()) {
         alert('规划失败：响应为空，请重试');
